@@ -24,6 +24,7 @@
 
 // Qt includes
 #include <QPainter>
+#include <QPainterPath>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QMenu>
@@ -755,6 +756,8 @@ void FunctionPanel::updateGadgets(TDoubleParam *curve) {
         m_gadgets.push_back(Gadget(EaseInPercentage, i, q, 6, 15));
         break;
       }
+      default:
+        break;
       }
 
       // Right handle
@@ -784,6 +787,8 @@ void FunctionPanel::updateGadgets(TDoubleParam *curve) {
           m_gadgets.push_back(Gadget(EaseOutPercentage, i, q, 6, 15));
           break;
         }
+        default:
+          break;
         }
       }
     }
@@ -993,6 +998,8 @@ void FunctionPanel::drawCurrentCurve(QPainter &painter) {
       painter.setPen(isHighlighted ? QColor(255, 126, 0) : m_selectedColor);
       painter.drawLine(p.x(), p.y() - 15, p.x(), p.y() + 15);
       break;
+    default:
+      break;
     }
   }
 
@@ -1054,6 +1061,8 @@ void FunctionPanel::drawGroupKeyframes(QPainter &painter) {
       pp.lineTo(p + QPointF(0, h));
       pp.lineTo(p + QPointF(d, h));
       painter.drawPath(pp);
+      break;
+    default:
       break;
     }
   }
@@ -1227,8 +1236,8 @@ void FunctionPanel::mousePressEvent(QMouseEvent *e) {
   FunctionTreeModel::Channel *currentChannel =
       m_functionTreeModel ? m_functionTreeModel->getCurrentChannel() : 0;
   if (!currentChannel ||
-      getCurveDistance(currentChannel->getParam(), winPos) > maxDistance &&
-          closestGadgetId < 0) {
+      (getCurveDistance(currentChannel->getParam(), winPos) > maxDistance &&
+          closestGadgetId < 0)) {
     // if current channel is undefined or its curve is too far from the clicked
     // point
     // the user is possibly trying to select a different curve
@@ -1466,8 +1475,8 @@ void FunctionPanel::fitGraphToWindow(bool currentCurveOnly) {
         f0 = fa;
         f1 = fb;
       } else {
-        f0 = qMin(f0, fa);
-        f1 = qMax(f1, fb);
+        f0 = std::min(f0, fa);
+        f1 = std::max(f1, fb);
       }
       double v        = curve->getValue(fa);
       if (unit) v     = unit->convertTo(v);
@@ -1477,8 +1486,8 @@ void FunctionPanel::fitGraphToWindow(bool currentCurveOnly) {
         double t    = (double)j / (double)(m - 1);
         double v    = curve->getValue((1 - t) * fa + t * fb);
         if (unit) v = unit->convertTo(v);
-        v0          = qMin(v0, v);
-        v1          = qMax(v1, v);
+        v0          = std::min(v0, v);
+        v1          = std::max(v1, v);
       }
     }
   }

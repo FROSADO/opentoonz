@@ -119,13 +119,18 @@ class FlipZoomer final : public ImageUtils::ShortcutZoomer {
 public:
   FlipZoomer(ImageViewer *parent) : ShortcutZoomer(parent) {}
 
-  bool zoom(bool zoomin, bool resetZoom) override {
-    static_cast<ImageViewer *>(getWidget())->zoomQt(zoomin, resetZoom);
+  bool zoom(bool zoomin, bool resetView) override {
+    static_cast<ImageViewer *>(getWidget())->zoomQt(zoomin, resetView);
     return true;
   }
 
   bool fit() override {
     static_cast<ImageViewer *>(getWidget())->fitView();
+    return true;
+  }
+
+  bool resetZoom() override {
+    static_cast<ImageViewer *>(getWidget())->resetZoom();
     return true;
   }
 
@@ -296,10 +301,6 @@ void ImageViewer::contextMenuEvent(QContextMenuEvent *event) {
     menu->addAction(action);
     action->setParent(m_flipbook);
 
-    if (m_flipbook->isSavable()) {
-      action = menu->addAction(tr("Save Images"));
-      connect(action, SIGNAL(triggered()), m_flipbook, SLOT(saveImages()));
-    }
     menu->addSeparator();
   }
 
@@ -340,9 +341,18 @@ void ImageViewer::contextMenuEvent(QContextMenuEvent *event) {
     }
 
     if (m_visualSettings.m_doCompare) {
-      if (!addedSep) menu->addSeparator();
+      if (!addedSep) {
+        menu->addSeparator();
+        addedSep = true;
+      }
       action = menu->addAction(tr("Swap Compared Images"));
       connect(action, SIGNAL(triggered()), SLOT(swapCompared()));
+    }
+
+    if (m_flipbook->isSavable()) {
+      if (!addedSep) menu->addSeparator();
+      action = menu->addAction(tr("Save Images"));
+      connect(action, SIGNAL(triggered()), m_flipbook, SLOT(saveImages()));
     }
   }
 
@@ -383,13 +393,17 @@ ImageViewer::~ImageViewer() {
 //-----------------------------------------------------------------------------
 /*! Set current image to \b image and update. If Histogram is visible set its
  * image.
-*/
+ */
 void ImageViewer::setImage(TImageP image) {
   m_image = image;
 
   if (m_image && m_firstImage) {
     m_firstImage = false;
     fitView();
+    // when the viewer size is large enough, limit the zoom ratio to 100% so
+    // that the image is shown in actual pixel size without jaggies due to
+    // resampling.
+    if (fabs(m_viewAff.det()) > 1.0) resetView();
   }
 
   if (m_isHistogramEnable && m_histogramPopup->isVisible())
@@ -433,7 +447,7 @@ void ImageViewer::initializeGL() {
   initializeOpenGLFunctions();
 
   // to be computed once through the software
-  if (m_lutCalibrator) {
+  if (m_lutCalibrator && !m_lutCalibrator->isInitialized()) {
     m_lutCalibrator->initialize();
     connect(context(), SIGNAL(aboutToBeDestroyed()), this,
             SLOT(onContextAboutToBeDestroyed()));
@@ -441,6 +455,13 @@ void ImageViewer::initializeGL() {
 
   // glClearColor(1.0,1.0,1.0,1);
   glClear(GL_COLOR_BUFFER_BIT);
+
+  if (m_firstInitialized)
+    m_firstInitialized = false;
+  else {
+    resizeGL(width(), height());
+    update();
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -573,7 +594,7 @@ void ImageViewer::paintGL() {
   } else if (m_draggingZoomSelection || m_rectRGBPick) {
     fromPos = TPoint(m_pressedMousePos.x - width() * 0.5,
                      height() * 0.5 - m_pressedMousePos.y);
-    toPos = TPoint(m_pos.x() - width() * 0.5, height() * 0.5 - m_pos.y());
+    toPos   = TPoint(m_pos.x() - width() * 0.5, height() * 0.5 - m_pos.y());
   }
   if (fromPos != TPoint() || toPos != TPoint()) {
     if (m_rectRGBPick) {
@@ -612,7 +633,7 @@ void ImageViewer::paintGL() {
 
 //------------------------------------------------------------------------------
 /*! Add to current trasformation matrix a \b delta traslation.
-*/
+ */
 void ImageViewer::panQt(const QPoint &delta) {
   if (delta == QPoint()) return;
 
@@ -671,6 +692,14 @@ void ImageViewer::zoomQt(bool forward, bool reset) {
         reset ? 1 : ImageUtils::getQuantizedZoomFactor(oldZoomScale, forward);
     setViewAff(TScale(zoomScale / oldZoomScale) * m_viewAff);
   }
+  update();
+}
+
+//-----------------------------------------------------------------------------
+
+void ImageViewer::resetZoom() {
+  double oldZoomScale = sqrt(m_viewAff.det());
+  setViewAff(TScale(1.0 / oldZoomScale) * m_viewAff);
   update();
 }
 
@@ -745,8 +774,25 @@ void ImageViewer::updateCursor(const TPoint &curPos) {
 }
 
 //---------------------------------------------------------------------------------------------
+
+void ImageViewer::showEvent(QShowEvent *) {
+  TSceneHandle *sceneHandle = TApp::instance()->getCurrentScene();
+  bool ret = connect(sceneHandle, SIGNAL(preferenceChanged(const QString &)),
+                     this, SLOT(onPreferenceChanged(const QString &)));
+  onPreferenceChanged("ColorCalibration");
+  assert(ret);
+}
+
+//---------------------------------------------------------------------------------------------
+
+void ImageViewer::hideEvent(QHideEvent *) {
+  TSceneHandle *sceneHandle = TApp::instance()->getCurrentScene();
+  if (sceneHandle) sceneHandle->disconnect(this);
+}
+
+//---------------------------------------------------------------------------------------------
 /*! If middle button is pressed pan the image. Update current mouse position.
-*/
+ */
 void ImageViewer::mouseMoveEvent(QMouseEvent *event) {
   if (!m_image) return;
 
@@ -841,7 +887,7 @@ void ImageViewer::mouseMoveEvent(QMouseEvent *event) {
 
 //---------------------------------------------------------------------------------------------
 /*! notify the color picked by rgb picker to palette controller
-*/
+ */
 void ImageViewer::setPickedColorToStyleEditor(const TPixel32 &color) {
   // do not modify the style #0
   TPaletteHandle *ph =
@@ -852,38 +898,70 @@ void ImageViewer::setPickedColorToStyleEditor(const TPixel32 &color) {
 }
 
 //---------------------------------------------------------------------------------------------
+
+TImageP ImageViewer::getPickedImage(QPointF mousePos) {
+  bool cursorIsInSnapShot = false;
+  if (m_visualSettings.m_doCompare) {
+    if (m_compareSettings.m_compareY == ImagePainter::DefaultCompareValue)
+      cursorIsInSnapShot =
+          m_compareSettings.m_swapCompared ==
+          (mousePos.x() > width() * m_compareSettings.m_compareX);
+    else
+      cursorIsInSnapShot =
+          m_compareSettings.m_swapCompared ==
+          (height() - mousePos.y() > height() * m_compareSettings.m_compareY);
+  }
+  if (cursorIsInSnapShot)
+    return TImageCache::instance()->get(QString("TnzCompareImg"), false);
+  else
+    return m_image;
+}
+
+//---------------------------------------------------------------------------------------------
 /*! rgb picking
-*/
+ */
 void ImageViewer::pickColor(QMouseEvent *event, bool putValueToStyleEditor) {
   if (!m_isHistogramEnable) return;
   if (!m_histogramPopup->isVisible()) return;
 
-  QPoint curPos = event->pos() * getDevPixRatio();
+  QPointF curPos = event->localPos() * getDevPixRatio();
 
   // avoid to pick outside of the flip
-  if ((!m_image) || !rect().contains(curPos)) {
+  if ((!m_image) || !rect().contains(curPos.toPoint())) {
     // throw transparent color
     m_histogramPopup->updateInfo(TPixel32::Transparent, TPointD(-1, -1));
     return;
   }
 
-  StylePicker picker(m_image);
+  TImageP img = getPickedImage(curPos);
+  if (!img) {
+    m_histogramPopup->updateInfo(TPixel32::Transparent, TPointD(-1, -1));
+    return;
+  }
 
-  TPoint mousePos = TPoint(curPos.x(), height() - 1 - curPos.y());
-  TRectD area     = TRectD(mousePos.x, mousePos.y, mousePos.x, mousePos.y);
+  StylePicker picker(img);
 
-  if (m_lutCalibrator && m_lutCalibrator->isValid()) m_fbo->bind();
+  TPointD mousePos = TPointD(curPos.x(), height() - 1 - curPos.y());
+  TRectD area      = TRectD(mousePos.x, mousePos.y, mousePos.x, mousePos.y);
 
-  const TPixel32 pix = picker.pickColor(area);
+  TPointD pos =
+      getViewAff().inv() * TPointD(curPos.x() - (qreal)(width()) / 2,
+                                   -curPos.y() + (qreal)(height()) / 2);
 
-  if (m_lutCalibrator && m_lutCalibrator->isValid()) m_fbo->release();
+  TRectD imgRect = (img->raster()) ? convert(TRect(img->raster()->getSize()))
+                                   : img->getBBox();
+  TPointD imagePos =
+      TPointD(0.5 * imgRect.getLx() + pos.x, 0.5 * imgRect.getLy() + pos.y);
 
-  QPoint viewP = mapFrom(this, curPos);
-  TPointD pos  = getViewAff().inv() *
-                TPointD(viewP.x() - width() / 2, -viewP.y() + height() / 2);
-  TPointD imagePos = TPointD(0.5 * m_image->getBBox().getLx() + pos.x,
-                             0.5 * m_image->getBBox().getLy() + pos.y);
-  if (m_image->getBBox().contains(imagePos)) {
+  TPixel32 pix;
+  if (m_lutCalibrator && m_lutCalibrator->isValid()) {
+    // for specifiying pixel range on picking vector
+    double scale2 = getViewAff().det();
+    pix           = picker.pickColor(pos + TPointD(-0.5, -0.5), 10.0, scale2);
+  } else
+    pix = picker.pickColor(area);
+
+  if (!img->raster() || imgRect.contains(imagePos)) {
     // throw the picked color to the histogram
     m_histogramPopup->updateInfo(pix, imagePos);
     // throw it to the style editor as well
@@ -897,12 +975,26 @@ void ImageViewer::pickColor(QMouseEvent *event, bool putValueToStyleEditor) {
 //---------------------------------------------------------------------------------------------
 /*! rectangular rgb picking. The picked color will be an average of pixels in
  * specified rectangle
-*/
+ */
 void ImageViewer::rectPickColor(bool putValueToStyleEditor) {
+  auto isRas32 = [this](TImageP img) -> bool {
+    TRasterImageP ri = img;
+    if (!ri) return false;
+    TRaster32P ras32 = ri->getRaster();
+    if (!ras32) return false;
+    return true;
+  };
+
   if (!m_isHistogramEnable) return;
   if (!m_histogramPopup->isVisible()) return;
 
-  StylePicker picker(m_image);
+  TImageP img = getPickedImage(m_pos);
+  if (!img) {
+    m_histogramPopup->updateAverageColor(TPixel32::Transparent);
+    return;
+  }
+
+  StylePicker picker(img);
 
   TPoint startPos =
       TPoint(m_pressedMousePos.x, height() - 1 - m_pressedMousePos.y);
@@ -914,11 +1006,15 @@ void ImageViewer::rectPickColor(bool putValueToStyleEditor) {
     return;
   }
 
-  if (m_lutCalibrator && m_lutCalibrator->isValid() && m_fbo) m_fbo->bind();
-
-  const TPixel32 pix = picker.pickColor(area.enlarge(-1, -1));
-
-  if (m_lutCalibrator && m_lutCalibrator->isValid() && m_fbo) m_fbo->release();
+  TPixel32 pix;
+  if (m_lutCalibrator && m_lutCalibrator->isValid() && isRas32(img)) {
+    TPointD start = getViewAff().inv() * TPointD(startPos.x - width() / 2,
+                                                 startPos.y - height() / 2);
+    TPointD end   = getViewAff().inv() *
+                  TPointD(endPos.x - width() / 2, endPos.y - height() / 2);
+    pix = picker.pickAverageColor(TRectD(start, end));
+  } else
+    pix = picker.pickColor(area.enlarge(-1, -1));
 
   // throw the picked color to the histogram
   m_histogramPopup->updateAverageColor(pix);
@@ -1031,7 +1127,7 @@ void ImageViewer::mousePressEvent(QMouseEvent *event) {
 
 //-----------------------------------------------------------------------------
 /*! Reset current mouse position and current mouse button event.
-*/
+ */
 void ImageViewer::mouseReleaseEvent(QMouseEvent *event) {
   if (!m_image) return;
   if (m_draggingZoomSelection && !m_visualSettings.m_defineLoadbox) {
@@ -1072,7 +1168,7 @@ void ImageViewer::mouseReleaseEvent(QMouseEvent *event) {
 
 //-----------------------------------------------------------------------------
 /*! Apply zoom.
-*/
+ */
 void ImageViewer::wheelEvent(QWheelEvent *event) {
   if (!m_image) return;
   if (event->orientation() == Qt::Horizontal) return;
@@ -1100,12 +1196,12 @@ void ImageViewer::wheelEvent(QWheelEvent *event) {
 
   default:  // Qt::MouseEventSynthesizedByQt,
             // Qt::MouseEventSynthesizedByApplication
-    {
-      std::cout << "not supported event: Qt::MouseEventSynthesizedByQt, "
-                   "Qt::MouseEventSynthesizedByApplication"
-                << std::endl;
-      break;
-    }
+  {
+    std::cout << "not supported event: Qt::MouseEventSynthesizedByQt, "
+                 "Qt::MouseEventSynthesizedByApplication"
+              << std::endl;
+    break;
+  }
 
   }  // end switch
 
@@ -1191,6 +1287,8 @@ TAffine ImageViewer::getImgToWidgetAffine(const TRectD &geom) const {
 void ImageViewer::adaptView(const TRect &imgRect, const TRect &viewRect) {
   QRect viewerRect(rect());
 
+  if (viewerRect.isEmpty()) return;
+
   double imageScale = std::min(viewerRect.width() / (double)viewRect.getLx(),
                                viewerRect.height() / (double)viewRect.getLy());
 
@@ -1247,6 +1345,32 @@ void ImageViewer::onContextAboutToBeDestroyed() {
   makeCurrent();
   m_lutCalibrator->cleanup();
   doneCurrent();
+  disconnect(context(), SIGNAL(aboutToBeDestroyed()), this,
+             SLOT(onContextAboutToBeDestroyed()));
+}
+
+//-----------------------------------------------------------------------------
+
+void ImageViewer::onPreferenceChanged(const QString &prefName) {
+  if (prefName == "ColorCalibration") {
+    if (Preferences::instance()->isColorCalibrationEnabled()) {
+      // if the window is so shriked that the gl widget is empty,
+      // showEvent can be called before creating the context.
+      if (!context()) return;
+      makeCurrent();
+      if (!m_lutCalibrator)
+        m_lutCalibrator = new LutCalibrator();
+      else
+        m_lutCalibrator->cleanup();
+      m_lutCalibrator->initialize();
+      connect(context(), SIGNAL(aboutToBeDestroyed()), this,
+              SLOT(onContextAboutToBeDestroyed()));
+      if (m_lutCalibrator->isValid() && !m_fbo)
+        m_fbo = new QOpenGLFramebufferObject(width(), height());
+      doneCurrent();
+    }
+    update();
+  }
 }
 
 //------------------------------------------------------------------
@@ -1404,10 +1528,9 @@ bool ImageViewer::event(QEvent *e) {
   }
   */
 
-  if (e->type() == QEvent::Gesture &&
-      CommandManager::instance()
-          ->getAction(MI_TouchGestureControl)
-          ->isChecked()) {
+  if (e->type() == QEvent::Gesture && CommandManager::instance()
+                                          ->getAction(MI_TouchGestureControl)
+                                          ->isChecked()) {
     gestureEvent(static_cast<QGestureEvent *>(e));
     return true;
   }
@@ -1425,7 +1548,7 @@ bool ImageViewer::event(QEvent *e) {
 
 //-----------------------------------------------------------------------------
 /*! load image from history
-*/
+ */
 class LoadRecentFlipbookImagesCommandHandler final : public MenuItemHandler {
 public:
   LoadRecentFlipbookImagesCommandHandler()
@@ -1453,7 +1576,7 @@ public:
 
 //-----------------------------------------------------------------------------
 /*! clear the history
-*/
+ */
 class ClearRecentFlipbookImagesCommandHandler final : public MenuItemHandler {
 public:
   ClearRecentFlipbookImagesCommandHandler()

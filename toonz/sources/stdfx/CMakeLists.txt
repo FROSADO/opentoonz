@@ -76,7 +76,18 @@ set(HEADERS
     iwa_timecodefx.h
     iwa_bokehreffx.h
     iwa_textfx.h
+    iwa_corridorgradientfx.h
+    iwa_spingradientfx.h
+    iwa_lineargradientfx.h
+    iwa_glarefx.h
+    iwa_fractalnoisefx.h
+    iwa_rainbow_intensity.h
+    iwa_rainbowfx.h
 )
+
+if(OpenCV_FOUND)
+    list(APPEND HEADERS iwa_bloomfx.h)
+endif()
 
 set(SOURCES
     adjustlevelsfx.cpp
@@ -258,7 +269,17 @@ set(SOURCES
     iwa_bokehreffx.cpp
     iwa_barreldistortfx.cpp
     iwa_textfx.cpp
+    iwa_corridorgradientfx.cpp
+    iwa_spingradientfx.cpp
+    iwa_lineargradientfx.cpp
+    iwa_glarefx.cpp
+    iwa_fractalnoisefx.cpp
+    iwa_rainbowfx.cpp
 )
+
+if(OpenCV_FOUND)
+    list(APPEND SOURCES iwa_bloomfx.cpp)
+endif()
 
 set(OBJCSOURCES
 )
@@ -270,7 +291,7 @@ add_definitions(
 )
 
 if(BUILD_ENV_APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-install_name,@rpath/libtnzstdfx.dylib")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-install_name,@executable_path/libtnzstdfx.dylib")
     add_dependencies(tnzstdfx tnzcore tnzbase toonzlib)
 endif()
 
@@ -295,15 +316,8 @@ include_directories(
 
 _find_toonz_library(TNZLIBS "tnzcore;tnzbase;toonzlib")
 
-if(BUILD_ENV_APPLE)
-    # macports を使っていると symbol が非互換の /opt/lib が引っ掛かってしまう
-    find_library(ICONV_LIB iconv HINTS /usr/lib)
-    if(ICONV_LIB-NOTFOUND)
-        message("************* NO ICONV ****************")
-    else()
-        message("************* ICONV:" ${ICONV_LIB})
-    endif()
-    target_link_libraries(tnzstdfx Qt5::Core Qt5::Gui Qt5::OpenGL ${GL_LIB} ${GLEW_LIB} ${TNZLIBS} ${ICONV_LIB})
-else()
-    target_link_libraries(tnzstdfx Qt5::Core Qt5::Gui Qt5::OpenGL ${GL_LIB} ${GLEW_LIB} ${TNZLIBS})
+target_link_libraries(tnzstdfx Qt5::Core Qt5::Gui Qt5::OpenGL ${GL_LIB} ${GLEW_LIB} ${TNZLIBS} ${PTHREAD_LIBRARY})
+
+if(OpenCV_FOUND)
+    target_link_libraries(tnzstdfx ${OpenCV_LIBS})
 endif()

@@ -71,7 +71,8 @@ class ImageViewer final : public GLWidgetForHighDpi {
   bool m_panning                         = false;
   double m_scaleFactor;  // used for zoom gesture
 
-  bool m_stylusUsed = false;
+  bool m_stylusUsed       = false;
+  bool m_firstInitialized = true;
 
   int getDragType(const TPoint &pos, const TRect &loadBox);
   void updateLoadbox(const TPoint &curPos);
@@ -81,6 +82,8 @@ class ImageViewer final : public GLWidgetForHighDpi {
   void pickColor(QMouseEvent *event, bool putValueToStyleEditor = false);
   void rectPickColor(bool putValueToStyleEditor = false);
   void setPickedColorToStyleEditor(const TPixel32 &color);
+  // get the image (m_image or the snapshot) to be picked.
+  TImageP getPickedImage(QPointF mousePos);
 
 public:
   ImageViewer(QWidget *parent, FlipBook *flipbook, bool showHistogram);
@@ -109,6 +112,7 @@ public:
    */
   void hideHistogram();
   void zoomQt(bool forward, bool reset);
+  void resetZoom();
 
   void setIsRemakingPreviewFx(bool on) {
     m_isRemakingPreviewFx = on;
@@ -128,6 +132,8 @@ protected:
   void resizeGL(int width, int height) override;
   void paintGL() override;
 
+  void showEvent(QShowEvent *) override;
+  void hideEvent(QHideEvent *) override;
   void mouseMoveEvent(QMouseEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;
@@ -140,10 +146,10 @@ protected:
 
   void dragCompare(const QPoint &dp);
 
-  void tabletEvent(QTabletEvent *e);
+  void tabletEvent(QTabletEvent *e) override;
   void touchEvent(QTouchEvent *e, int type);
   void gestureEvent(QGestureEvent *e);
-  bool event(QEvent *e);
+  bool event(QEvent *e) override;
 
 public slots:
 
@@ -153,6 +159,7 @@ public slots:
   void showHistogram();
   void swapCompared();
   void onContextAboutToBeDestroyed();
+  void onPreferenceChanged(const QString &prefName);
 
 private:
   QPointF m_firstPanPoint;

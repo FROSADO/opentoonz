@@ -171,9 +171,13 @@ class DVAPI DockWidget : public QFrame {
 public:
   void maximizeDock();
 
+  bool getCanFixWidth() { return m_canFixWidth; }
+  void setCanFixWidth(bool fixed) { m_canFixWidth = fixed; }
+
 protected:
   // Private attributes for dragging purposes
-  bool m_floating;   // Whether this window is floating or docked
+  bool m_floating;  // Whether this window is floating or docked
+  bool m_wasFloating;
   bool m_dragging;   // Whether this window is being dragged
   bool m_undocking;  // Still docked, but after a mouse button press on a title
                      // bar.
@@ -185,6 +189,12 @@ protected:
 
   // Maximization
   bool m_maximized;
+
+  // Level Strip and Style Editor use a fixed width on 
+  // window resize to minimize user frustration
+  // This variable is only used by Level Strip right now.
+  // This is only true if the level strip is vertical.
+  bool m_canFixWidth = false;
 
 private:
   QPoint m_dragInitialPos;
@@ -211,6 +221,8 @@ public:
   DockLayout *parentLayout() const { return m_parentLayout; }
 
   bool isFloating() const { return m_floating; }
+  bool wasFloating() const { return m_wasFloating; }
+  void clearWasFloating() { m_wasFloating = false; }
   bool isMaximized() const { return m_maximized; }
 
   // Query functions
@@ -520,6 +532,9 @@ public:
   DockPlaceholder *placeholder(int i) const { return m_placeholders[i]; }
 
   unsigned int find(const Region *subRegion) const;
+
+  bool checkWidgetsToBeFixedWidth(std::vector<QWidget *> &widgets,
+                                  bool &fromDocking);
 
 private:
   // Setters - private

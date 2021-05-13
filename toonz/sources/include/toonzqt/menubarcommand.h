@@ -51,8 +51,11 @@ enum CommandType {
   MenuLevelCommandType,
   MenuXsheetCommandType,
   MenuCellsCommandType,
+  MenuPlayCommandType,
+  MenuRenderCommandType,
   MenuViewCommandType,
   MenuWindowsCommandType,
+  MenuHelpCommandType,
   PlaybackCommandType,
   RGBACommandType,
   FillCommandType,
@@ -60,7 +63,9 @@ enum CommandType {
   ToolModifierCommandType,
   ZoomCommandType,
   MiscCommandType,
-  MenuCommandType
+  MenuCommandType,
+  VisualizationButtonCommandType,
+  StopMotionCommandType
 };
 
 //-----------------------------------------------------------------------------

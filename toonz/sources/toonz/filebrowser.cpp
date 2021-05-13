@@ -26,7 +26,6 @@
 #include "toonz/toonzscene.h"
 #include "toonz/txshsimplelevel.h"
 #include "toonz/txshsoundlevel.h"
-#include "toonz/screensavermaker.h"
 #include "toonz/tproject.h"
 #include "toonz/txshlevelhandle.h"
 #include "toonz/namebuilder.h"
@@ -240,6 +239,8 @@ FileBrowser::FileBrowser(QWidget *parent, Qt::WFlags flags, bool noContextMenu,
 
   ret = ret && connect(m_itemViewer, SIGNAL(clickedItem(int)), this,
                        SLOT(onClickedItem(int)));
+  ret = ret && connect(m_itemViewer, SIGNAL(doubleClickedItem(int)), this,
+                       SLOT(onDoubleClickedItem(int)));
   ret =
       ret && connect(m_itemViewer, SIGNAL(selectedItems(const std::set<int> &)),
                      this, SLOT(onSelectedItems(const std::set<int> &)));
@@ -297,7 +298,7 @@ FileBrowser::~FileBrowser() {}
 
 //-----------------------------------------------------------------------------
 /*! when the m_folderName is edited, move the current folder accordingly
-*/
+ */
 void FileBrowser::onFolderEdited() {
   TFilePath inputPath(m_folderName->text().toStdWString());
   QModelIndex index = DvDirModel::instance()->getIndexByPath(inputPath);
@@ -397,18 +398,18 @@ void FileBrowser::onFwdButtonPushed() {
 
 //-----------------------------------------------------------------------------
 /*! clear the history when the tree date is replaced
-*/
+ */
 void FileBrowser::clearHistory() {
   int size = m_indexHistoryList.size();
   // leave the last item
-  for (int i        = 1; i < size; i++) m_indexHistoryList.removeLast();
+  for (int i = 1; i < size; i++) m_indexHistoryList.removeLast();
   m_currentPosition = 0;
   refreshHistoryButtons();
 }
 
 //-----------------------------------------------------------------------------
 /*! update the current folder when changes detected from QFileSystemWatcher
-*/
+ */
 void FileBrowser::onFileSystemChanged(const QString &folderPath) {
   if (folderPath != m_folder.getQString()) return;
   // changes may create/delete of folder, so update the DvDirModel
@@ -579,6 +580,17 @@ void FileBrowser::refreshCurrentFolderItems() {
     }
     TFilePathSet::iterator it;
     for (it = files.begin(); it != files.end(); ++it) {
+#ifdef _WIN32
+      // include folder shortcut items
+      if (it->getType() == "lnk") {
+        TFileStatus info(*it);
+        if (info.isLink() && info.isDirectory()) {
+          m_items.push_back(
+              Item(*it, true, true, QString::fromStdString((*it).getName())));
+        }
+        continue;
+      }
+#endif
       // skip the plt file (Palette file for TOONZ 4.6 and earlier)
       if (it->getType() == "plt") continue;
 
@@ -733,6 +745,17 @@ void FileBrowser::setUnregisteredFolder(const TFilePath &fp) {
     }
 
     for (it = files.begin(); it != files.end(); ++it) {
+#ifdef _WIN32
+      // include folder shortcut items
+      if (it->getType() == "lnk") {
+        TFileStatus info(*it);
+        if (info.isLink() && info.isDirectory()) {
+          m_items.push_back(
+              Item(*it, true, true, QString::fromStdString((*it).getName())));
+        }
+        continue;
+      }
+#endif
       // skip the plt file (Palette file for TOONZ 4.6 and earlier)
       if (it->getType() == "plt") continue;
 
@@ -797,7 +820,7 @@ void FileBrowser::setHistoryDay(std::string dayDateString) {
 //-----------------------------------------------------------------------------
 /*! for all items in the folder, retrieve the file names(m_name) from the
  * paths(m_path)
-*/
+ */
 void FileBrowser::refreshData() {
   std::vector<Item>::iterator it;
   for (it = m_items.begin(); it != m_items.end(); ++it) {
@@ -895,20 +918,23 @@ QVariant FileBrowser::getItemData(int index, DataType dataType,
     QSize iconSize = m_itemViewer->getPanel()->getIconSize();
     // parent folder icons
     if (item.m_path == m_folder.getParentDir()) {
-      static QPixmap folderUpPixmap(svgToPixmap(":Resources/folderup_icon.svg",
-                                                iconSize, Qt::KeepAspectRatio));
+      static QPixmap folderUpPixmap(
+          svgToPixmap(getIconThemePath("actions/60/folder_browser_up.svg"),
+                      iconSize, Qt::KeepAspectRatio));
       return folderUpPixmap;
     }
     // folder icons
     else if (item.m_isFolder) {
       if (item.m_isLink) {
-        static QPixmap linkIcon(svgToPixmap(":Resources/link_icon.svg",
-                                            iconSize, Qt::KeepAspectRatio));
-        return linkIcon;
+        static QPixmap folderLinkPixmap(
+            svgToPixmap(getIconThemePath("actions/60/folder_browser_link.svg"),
+                        iconSize, Qt::KeepAspectRatio));
+        return folderLinkPixmap;
       } else {
-        static QPixmap folderIcon(svgToPixmap(":Resources/folder_icon.svg",
-                                              iconSize, Qt::KeepAspectRatio));
-        return folderIcon;
+        static QPixmap folderPixmap(
+            svgToPixmap(getIconThemePath("actions/60/folder_browser.svg"),
+                        iconSize, Qt::KeepAspectRatio));
+        return folderPixmap;
       }
     }
 
@@ -1113,19 +1139,6 @@ QMenu *FileBrowser::getContextMenu(QWidget *parent, int index) {
   if (files.size() == 1 && files[0].getType() == "tnz") {
     menu->addAction(cm->getAction(MI_LoadScene));
   }
-#ifdef _WIN32
-  else if (files.size() == 1 && files[0].getType() == "scr") {
-    QAction *action;
-    action = new QAction(tr("Preview Screensaver"), menu);
-    ret    = ret && connect(action, SIGNAL(triggered()), this,
-                         SLOT(previewScreenSaver()));
-    menu->addAction(action);
-    action = new QAction(tr("Install Screensaver"), menu);
-    ret    = ret && connect(action, SIGNAL(triggered()), this,
-                         SLOT(installScreenSaver()));
-    menu->addAction(action);
-  }
-#endif
 
   bool areResources = true;
   bool areScenes    = false;
@@ -1133,7 +1146,7 @@ QMenu *FileBrowser::getContextMenu(QWidget *parent, int index) {
   for (i = 0; i < (int)files.size(); i++) {
     TFileType::Type type = TFileType::getInfo(files[i]);
     if (areResources && !TFileType::isResource(type)) areResources = false;
-    if (!areScenes && TFileType::isScene(type)) areScenes          = true;
+    if (!areScenes && TFileType::isScene(type)) areScenes = true;
   }
 
   bool areFullcolor = true;
@@ -1154,8 +1167,8 @@ QMenu *FileBrowser::getContextMenu(QWidget *parent, int index) {
     if (clickedFile != TFilePath() && clickedFile.getType() == "tnz")
       title = tr("Load As Sub-xsheet");
     else
-      title         = tr("Load");
-    QAction *action = new QAction(title, menu);
+      title = tr("Load");
+    QAction *action = new QAction(QIcon(createQIcon("import")), title, menu);
     ret             = ret &&
           connect(action, SIGNAL(triggered()), this, SLOT(loadResources()));
     menu->addAction(action);
@@ -1204,8 +1217,9 @@ QMenu *FileBrowser::getContextMenu(QWidget *parent, int index) {
     if (!areFullcolor) menu->addSeparator();
   }
   if (files.size() == 1 && files[0].getType() != "tnz") {
-    QAction *action = new QAction(tr("Rename"), menu);
-    ret             = ret && connect(action, SIGNAL(triggered()), this,
+    QAction *action =
+        new QAction(QIcon(createQIcon("rename")), tr("Rename"), menu);
+    ret = ret && connect(action, SIGNAL(triggered()), this,
                          SLOT(renameAsToonzLevel()));
     menu->addAction(action);
   }
@@ -1328,6 +1342,10 @@ QMenu *FileBrowser::getContextMenu(QWidget *parent, int index) {
     }
 
     if (status == DvItemListModel::VC_Locked && files.size() == 1) {
+      action = vcMenu->addAction(tr("Unlock"));
+      ret    = ret && connect(action, SIGNAL(triggered()), this,
+                           SLOT(unlockVersionControl()));
+
       action = vcMenu->addAction(tr("Edit Info"));
       ret    = ret && connect(action, SIGNAL(triggered()), this,
                            SLOT(showLockInformation()));
@@ -1620,6 +1638,7 @@ void RenameAsToonzPopup::onOk() {
            "characters:(new line)  \\ / : * ? \"  |"));
     return;
   }
+  if (isReservedFileName_message(m_name->text())) return;
   accept();
 }
 
@@ -1674,7 +1693,7 @@ namespace {
 
 bool parsePathName(const QString &fullpath, QString &parentPath, QString &name,
                    QString &format) {
-  int index              = fullpath.lastIndexOf('\\');
+  int index = fullpath.lastIndexOf('\\');
   if (index == -1) index = fullpath.lastIndexOf('/');
 
   QString filename;
@@ -2040,13 +2059,16 @@ void FileBrowser::convertToPaintedTlv() {
 //-----------------------------------------------------------------------------
 
 void FileBrowser::onSelectedItems(const std::set<int> &indexes) {
-  if (indexes.empty()) return;
-
   std::set<TFilePath> filePaths;
   std::set<int>::const_iterator it;
 
   // pass the frameId list for reuse
   std::list<std::vector<TFrameId>> frameIDs;
+
+  if (indexes.empty()) {  // inform selection is released
+    emit filePathsSelected(filePaths, frameIDs);
+    return;
+  }
 
   for (it = indexes.begin(); it != indexes.end(); ++it) {
     filePaths.insert(m_items[*it].m_path);
@@ -2075,6 +2097,22 @@ void FileBrowser::onClickedItem(int index) {
 
 //-----------------------------------------------------------------------------
 
+void FileBrowser::onDoubleClickedItem(int index) {
+  // TODO: Avoid duplicate code with onClickedItem().
+  if (0 <= index && index < (int)m_items.size()) {
+    // if the folder is clicked, then move the current folder
+    TFilePath fp = m_items[index].m_path;
+    if (m_items[index].m_isFolder) {
+      setFolder(fp, true);
+      QModelIndex index = m_folderTreeView->currentIndex();
+      if (index.isValid()) m_folderTreeView->scrollTo(index);
+    } else
+      emit filePathDoubleClicked(fp);
+  }
+}
+
+//-----------------------------------------------------------------------------
+
 void FileBrowser::refreshFolder(const TFilePath &folderPath) {
   std::set<FileBrowser *>::iterator it;
   for (it = activeBrowsers.begin(); it != activeBrowsers.end(); ++it) {
@@ -2083,6 +2121,16 @@ void FileBrowser::refreshFolder(const TFilePath &folderPath) {
     if (browser->getFolder() == folderPath) {
       browser->setFolder(folderPath, false, true);
     }
+  }
+}
+
+//-----------------------------------------------------------------------------
+
+void FileBrowser::updateItemViewerPanel() {
+  std::set<FileBrowser *>::iterator it;
+  for (it = activeBrowsers.begin(); it != activeBrowsers.end(); ++it) {
+    FileBrowser *browser = *it;
+    browser->m_itemViewer->getPanel()->update();
   }
 }
 
@@ -2138,7 +2186,14 @@ void FileBrowser::refresh() {
 
 void FileBrowser::folderUp() {
   QModelIndex index = m_folderTreeView->currentIndex();
-  if (!index.isValid() || !index.parent().isValid()) return;
+  if (!index.isValid() || !index.parent().isValid()) {
+    // cannot go up tree view, so try going to parent directory
+    TFilePath parentFp = m_folder.getParentDir();
+    if (parentFp != TFilePath("") && parentFp != m_folder) {
+      setFolder(parentFp, true);
+    }
+    return;
+  }
   m_folderTreeView->setCurrentIndex(index.parent());
   m_folderTreeView->scrollTo(index.parent());
 }
@@ -2183,31 +2238,6 @@ void FileBrowser::newFolder() {
 
 //-----------------------------------------------------------------------------
 
-void FileBrowser::previewScreenSaver() {
-  std::vector<TFilePath> files;
-  FileSelection *fs =
-      dynamic_cast<FileSelection *>(m_itemViewer->getPanel()->getSelection());
-  if (!fs) return;
-  fs->getSelectedFiles(files);
-  if (files.size() != 1 || files[0].getType() != "scr") return;
-
-  QDesktopServices::openUrl(QUrl(toQString(files[0])));
-}
-
-//-----------------------------------------------------------------------------
-
-void FileBrowser::installScreenSaver() {
-  std::vector<TFilePath> files;
-  FileSelection *fs =
-      dynamic_cast<FileSelection *>(m_itemViewer->getPanel()->getSelection());
-  if (!fs) return;
-  fs->getSelectedFiles(files);
-  if (files.size() != 1 || files[0].getType() != "scr") return;
-  ::installScreenSaver(files[0]);
-}
-
-//-----------------------------------------------------------------------------
-
 void FileBrowser::showEvent(QShowEvent *) {
   activeBrowsers.insert(this);
   // refresh
@@ -2244,6 +2274,22 @@ void FileBrowser::enableGlobalSelection(bool enabled) {
 //-----------------------------------------------------------------------------
 
 void FileBrowser::selectNone() { m_itemViewer->selectNone(); }
+
+//-----------------------------------------------------------------------------
+
+void FileBrowser::enableDoubleClickToOpenScenes() {
+  // perhaps this should disconnect existing signal handlers first
+  connect(this, SIGNAL(filePathDoubleClicked(const TFilePath &)), this,
+          SLOT(tryToOpenScene(const TFilePath &)));
+}
+
+//-----------------------------------------------------------------------------
+
+void FileBrowser::tryToOpenScene(const TFilePath &filePath) {
+  if (filePath.getType() == "tnz") {
+    IoCmd::loadScene(filePath);
+  }
+}
 
 //=============================================================================
 // FCData methods

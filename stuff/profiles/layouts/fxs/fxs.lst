@@ -38,12 +38,14 @@
   <Gradient>
     STD_diamondGradientFx
     STD_fourPointsGradientFx 
-    STD_linearGradientFx
+    STD_iwa_LinearGradientFx
     STD_multiLinearGradientFx 
     STD_multiRadialGradientFx   
     STD_radialGradientFx
     STD_spiralFx 
     STD_squareGradientFx 
+    STD_iwa_CorridorGradientFx 
+    STD_iwa_SpinGradientFx 
   </Gradient>
   <Image_Adjust>
     STD_iwa_AdjustExposureFx
@@ -122,6 +124,9 @@
     STD_iwa_SpectrumFx
     STD_iwa_SoapBubbleFx
     STD_targetSpotFx
+    STD_iwa_GlareFx
+    STD_iwa_BloomFx
+    STD_iwa_RainbowFx
   </Light>
   <Matte>
     STD_erodeDilateFx
@@ -140,6 +145,7 @@
     STD_noiseFx 
     STD_iwa_PNPerspectiveFx
     STD_saltpepperNoiseFx 
+    STD_iwa_FractalNoiseFx 
   </Noise>
   <Render>
     STD_cloudsFx 

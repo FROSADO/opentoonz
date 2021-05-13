@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1">
+<TS version="2.1" language="fr">
 <context>
     <name>ArrowToolOptionsBox</name>
     <message>
@@ -12,12 +12,12 @@
         <translation>Position</translation>
     </message>
     <message>
-        <source>E/W:</source>
-        <translation>E/O:</translation>
+        <source>X:</source>
+        <translation>X:</translation>
     </message>
     <message>
-        <source>N/S:</source>
-        <translation>N/S:</translation>
+        <source>Y:</source>
+        <translation>Y:</translation>
     </message>
     <message>
         <source>Z:</source>
@@ -100,7 +100,7 @@
     </message>
     <message>
         <source>Accuracy:</source>
-        <translation>Précision:</translation>
+        <translation type="vanished">Précision:</translation>
     </message>
     <message>
         <source>Selective</source>
@@ -108,7 +108,7 @@
     </message>
     <message>
         <source>Preset:</source>
-        <translation>Paramètre Prédéfini:</translation>
+        <translation type="vanished">Paramètre Prédéfini:</translation>
     </message>
     <message>
         <source>Break Sharp Angles</source>
@@ -124,99 +124,19 @@
     </message>
     <message>
         <source>Cap</source>
-        <translation>Extrémité</translation>
+        <translation type="vanished">Extrémité</translation>
     </message>
     <message>
         <source>Join</source>
-        <translation>Sommet</translation>
+        <translation type="vanished">Sommet</translation>
     </message>
     <message>
         <source>Miter:</source>
-        <translation>Pointe:</translation>
-    </message>
-    <message>
-        <source>Size</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Break</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Pressure</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Smooth:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Range:</source>
-        <translation type="unfinished"></translation>
+        <translation type="vanished">Pointe:</translation>
     </message>
     <message>
         <source>Snap</source>
-        <translation type="unfinished">Magnétisme</translation>
-    </message>
-    <message>
-        <source>&lt;custom&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Off</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Linear</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>In</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Out</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>In&amp;Out</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Low</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>High</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Butt cap</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Round cap</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Projecting cap</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Miter join</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Round join</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Bevel join</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Med</source>
-        <translation type="unfinished"></translation>
+        <translation type="obsolete">Magnétisme</translation>
     </message>
 </context>
 <context>
@@ -239,6 +159,34 @@
     <message>
         <source>Auto Select Drawing</source>
         <translation>Sélection Automatique du Dessin</translation>
+    </message>
+    <message>
+        <source>Snap</source>
+        <translation type="unfinished">Magnétisme</translation>
+    </message>
+    <message>
+        <source>Type:</source>
+        <translation type="unfinished">Type:</translation>
+    </message>
+    <message>
+        <source>Rectangular</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Freehand</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Low</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Med</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>High</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -274,20 +222,20 @@
         <translation>Clé Globale</translation>
     </message>
     <message>
-        <source>Lock Center E/W</source>
-        <translation>Verrouiller le Centre E/O</translation>
+        <source>Lock Center X</source>
+        <translation>Verrouiller le Centre X</translation>
     </message>
     <message>
-        <source>Lock Center N/S</source>
-        <translation>Verrouiller le Centre N/S</translation>
+        <source>Lock Center Y</source>
+        <translation>Verrouiller le Centre Y</translation>
     </message>
     <message>
-        <source>Lock Position E/W</source>
-        <translation>Verrouiller la Position E/O</translation>
+        <source>Lock Position X</source>
+        <translation>Verrouiller la Position X</translation>
     </message>
     <message>
-        <source>Lock Position N/S</source>
-        <translation>Verrouiller la Position N/S</translation>
+        <source>Lock Position Y</source>
+        <translation>Verrouiller la Position Y</translation>
     </message>
     <message>
         <source>Lock Rotation</source>
@@ -314,8 +262,8 @@
         <translation>Verrouiller l&apos; Échelle Globale</translation>
     </message>
     <message>
-        <source>E/W and N/S Positions</source>
-        <translation>Positions E/O et N/S</translation>
+        <source>X and Y Positions</source>
+        <translation>Positions X et Y</translation>
     </message>
     <message>
         <source>Z Position</source>
@@ -446,6 +394,26 @@
     </message>
     <message>
         <source>Lines &amp; Areas</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Segment</source>
+        <translation type="unfinished">Segment</translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ease In</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ease Out</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ease In/Out</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -614,6 +582,20 @@
     </message>
     <message>
         <source>Polyline</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FullColorFillTool</name>
+    <message>
+        <source>Fill Depth</source>
+        <translation type="unfinished">Profondeur de Remplissage </translation>
+    </message>
+</context>
+<context>
+    <name>HandToolOptionsBox</name>
+    <message>
+        <source>Reset Position</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -962,6 +944,14 @@ Voulez-vous continuer?</translation>
         <source>Med</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>MultiArc</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Smooth</source>
+        <translation type="unfinished">Lisser</translation>
+    </message>
 </context>
 <context>
     <name>PumpTool</name>
@@ -1140,6 +1130,38 @@ Voulez-vous continuer?</translation>
         <source> to Backward</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>The selection cannot be updated. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be deleted. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be pasted. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be grouped. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be entered. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be ungrouped. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selection cannot be moved. It is not editable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Snap At Intersection</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>RGBPickerTool</name>
@@ -1241,6 +1263,13 @@ Voulez-vous continuer?</translation>
     </message>
 </context>
 <context>
+    <name>RotateToolOptionsBox</name>
+    <message>
+        <source>Reset Rotation</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>RulerToolOptionsBox</name>
     <message>
         <source>X:</source>
@@ -1307,12 +1336,12 @@ Voulez-vous continuer?</translation>
         <translation>Rotation</translation>
     </message>
     <message>
-        <source>E/W:</source>
-        <translation>E/O:</translation>
+        <source>X:</source>
+        <translation>X:</translation>
     </message>
     <message>
-        <source>N/S:</source>
-        <translation>N/S:</translation>
+        <source>Y:</source>
+        <translation>Y:</translation>
     </message>
     <message>
         <source>Thickness</source>
@@ -1476,6 +1505,113 @@ moved to the end of the first page of the palette.</source>
     </message>
 </context>
 <context>
+    <name>ToonzVectorBrushTool</name>
+    <message>
+        <source>Size</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Accuracy:</source>
+        <translation>Précision:</translation>
+    </message>
+    <message>
+        <source>Smooth:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preset:</source>
+        <translation>Paramètre Prédéfini:</translation>
+    </message>
+    <message>
+        <source>&lt;custom&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Break</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pressure</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cap</source>
+        <translation>Extrémité</translation>
+    </message>
+    <message>
+        <source>Join</source>
+        <translation>Sommet</translation>
+    </message>
+    <message>
+        <source>Miter:</source>
+        <translation>Pointe:</translation>
+    </message>
+    <message>
+        <source>Range:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Snap</source>
+        <translation>Magnétisme</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>In</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Out</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>In&amp;Out</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Low</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Med</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>High</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Butt cap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Round cap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Projecting cap</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Miter join</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Round join</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Bevel join</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>TrackerTool</name>
     <message>
         <source>Width:</source>
@@ -1595,6 +1731,10 @@ moved to the end of the first page of the palette.</source>
         <source>Bevel join</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Include Intersection</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>VectorTapeTool</name>
@@ -1636,6 +1776,13 @@ moved to the end of the first page of the palette.</source>
     </message>
     <message>
         <source>Rectangular</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ZoomToolOptionsBox</name>
+    <message>
+        <source>Reset Zoom</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

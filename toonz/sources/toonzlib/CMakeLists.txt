@@ -108,7 +108,6 @@ set(HEADERS
     ../include/toonz/scenefx.h
     ../include/toonz/sceneproperties.h
     ../include/toonz/sceneresources.h
-    ../include/toonz/screensavermaker.h
     ../include/toonz/skeleton.h
     ../include/toonz/stage.h
     ../include/toonz/stage2.h
@@ -160,6 +159,9 @@ set(HEADERS
     ../include/toonz/txshzeraryfxlevel.h
     ../include/toonz/vectorizerparameters.h
     ../include/toutputproperties.h
+    ../include/toonz/preferencesitemids.h
+    ../include/toonz/txsheetcolumnchange.h
+    ../include/toonz/expressionreferencemonitor.h
 )
 
 set(SOURCES
@@ -167,7 +169,6 @@ set(SOURCES
     autoclose.cpp
     autopos.cpp
     captureparameters.cpp
-	cellpositionratio.cpp
     childstack.cpp
     cleanupcolorstyles.cpp
     cleanuppalette.cpp
@@ -209,7 +210,6 @@ set(SOURCES
     scenefx.cpp
     sceneproperties.cpp
     sceneresources.cpp
-    screensavermaker.cpp
     scriptbinding.cpp
     scriptbinding_centerline_vectorizer.cpp
     scriptbinding_files.cpp
@@ -328,13 +328,15 @@ if(BUILD_TARGET_WIN)
     )
 endif()
 
-add_translation(toonzlib ${HEADERS} ${SOURCES})
+if(WITH_TRANSLATION)
+    add_translation(toonzlib ${HEADERS} ${SOURCES})
+endif()
 
 qt5_wrap_cpp(SOURCES ${MOC_HEADERS})
 
 add_library(toonzlib SHARED ${HEADERS} ${SOURCES})
 if(BUILD_ENV_APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-install_name,@rpath/libtoonzlib.dylib")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-install_name,@executable_path/libtoonzlib.dylib")
     add_dependencies(toonzlib tnzcore tnzbase tnzext)
 endif()
 
@@ -344,6 +346,12 @@ add_definitions(
 
 message("subdir: toonzlib")
 message("Bin: " ${CMAKE_CURRENT_BINARY_DIR})
+
+if(GLEW_FOUND)
+    include_directories(${GLEW_INCLUDE_DIRS})
+else()
+    include_directories(${SDKROOT}/glew/glew-1.9.0/include)
+endif()
 
 include_directories(
     SYSTEM
@@ -356,19 +364,19 @@ include_directories(
 if(BUILD_ENV_MSVC)
     target_link_libraries(toonzlib
         Qt5::Core Qt5::Gui Qt5::OpenGL Qt5::Script Qt5::Multimedia
-        ${GLUT_LIB} ${GL_LIB} ${MYPAINT_LIB_LDFLAGS} vfw32.lib
+        ${GLUT_LIB} ${GL_LIB} ${MYPAINT_LIB_LDFLAGS} ${GLEW_LIB} vfw32.lib
         tnzcore tnzbase tnzext
     )
 elseif(BUILD_ENV_APPLE)
     set(EXTRA_LIBS
-        ${CMAKE_CURRENT_BINARY_DIR}/../tnzcore/libtnzcore.dylib
-        ${CMAKE_CURRENT_BINARY_DIR}/../tnzbase/libtnzbase.dylib
-        ${CMAKE_CURRENT_BINARY_DIR}/../tnzext/libtnzext.dylib
+        "$<TARGET_FILE:tnzcore>"
+	    "$<TARGET_FILE:tnzbase>"
+	    "$<TARGET_FILE:tnzext>"
         ${USB_LIB}
         ${MYPAINT_LIB_LDFLAGS}
     )
 
-    target_link_libraries(toonzlib Qt5::Core Qt5::Gui Qt5::OpenGL Qt5::Script Qt5::Multimedia ${GLUT_LIB} ${GL_LIB} ${EXTRA_LIBS})
+    target_link_libraries(toonzlib Qt5::Core Qt5::Gui Qt5::OpenGL Qt5::Script Qt5::Multimedia ${GLUT_LIB} ${GL_LIB} ${GLEW_LIB} ${EXTRA_LIBS})
 elseif(BUILD_ENV_UNIXLIKE)
     _find_toonz_library(EXTRA_LIBS "tnzcore;tnzbase;tnzext")
 
@@ -376,5 +384,5 @@ elseif(BUILD_ENV_UNIXLIKE)
         set(EXTRA_LIBS ${EXTRA_LIBS} -lvfw32)
     endif()
 
-    target_link_libraries(toonzlib Qt5::Core Qt5::Gui Qt5::OpenGL Qt5::Script Qt5::Multimedia ${GLUT_LIB} ${GL_LIB} ${EXTRA_LIBS} ${MYPAINT_LIB_LDFLAGS})
+    target_link_libraries(toonzlib Qt5::Core Qt5::Gui Qt5::OpenGL Qt5::Script Qt5::Multimedia ${GLUT_LIB} ${GL_LIB} ${GLEW_LIB} ${EXTRA_LIBS} ${MYPAINT_LIB_LDFLAGS})
 endif()

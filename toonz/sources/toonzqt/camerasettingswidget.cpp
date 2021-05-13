@@ -9,6 +9,7 @@
 #include "toonzqt/checkbox.h"
 #include "toonzqt/tselectionhandle.h"
 #include "toonzqt/dvdialog.h"
+#include <toonzqt/gutil.h>
 
 // TnzLib includes
 #include "toonz/toonzfolders.h"
@@ -63,6 +64,10 @@ QString removeZeros(QString srcStr) {
   }
   return srcStr;
 }
+
+// Preference values of the unit - translation text
+QMap<QString, QString> unitTrMap;
+
 }  // namespace
 
 //=============================================================================
@@ -173,6 +178,14 @@ CameraSettingsWidget::CameraSettingsWidget(bool forCleanup)
     , m_arValue(0)
     , m_presetListFile("")
     , m_currentLevel(0) {
+  if (unitTrMap.isEmpty()) {
+    unitTrMap["cm"]    = tr("cm");
+    unitTrMap["mm"]    = tr("mm");
+    unitTrMap["inch"]  = tr("inch");
+    unitTrMap["field"] = tr("field");
+    unitTrMap["pixel"] = tr("pixel");
+  }
+
   m_xPrev    = new QRadioButton();
   m_yPrev    = new QRadioButton();
   m_arPrev   = new QRadioButton();
@@ -192,7 +205,8 @@ CameraSettingsWidget::CameraSettingsWidget(bool forCleanup)
   if (Preferences::instance()->getPixelsOnly())
     m_unitLabel->setText(tr("Pixels"));
   else
-    m_unitLabel->setText(Preferences::instance()->getCameraUnits());
+    m_unitLabel->setText(
+        unitTrMap.value(Preferences::instance()->getCameraUnits()));
   m_dpiLabel = new QLabel(tr("DPI"));
   m_resLabel = new QLabel(tr("Pixels"));
   m_xLabel   = new QLabel(tr("x"));
@@ -240,14 +254,14 @@ CameraSettingsWidget::CameraSettingsWidget(bool forCleanup)
   m_fspChk->setFixedSize(20, 20);
   m_fspChk->setCheckable(true);
   m_fspChk->setChecked(true);
-
   m_fspChk->setToolTip(tr("Force Squared Pixel"));
   m_fspChk->setObjectName("ForceSquaredPixelButton");
+  m_fspChk->setIcon(createQIcon("squarepixel"));
   m_addPresetBtn->setObjectName("PushButton_NoPadding");
   m_removePresetBtn->setObjectName("PushButton_NoPadding");
 
-  m_inchPrev->setFixedSize(11, 21);
-  m_dotPrev->setFixedSize(11, 21);
+  m_inchPrev->setFixedSize(13, 13);
+  m_dotPrev->setFixedSize(13, 13);
   m_inchPrev->setObjectName("CameraSettingsRadioButton_Small");
   m_dotPrev->setObjectName("CameraSettingsRadioButton_Small");
 
@@ -395,7 +409,8 @@ void CameraSettingsWidget::showEvent(QShowEvent *e) {
   if (Preferences::instance()->getPixelsOnly())
     m_unitLabel->setText(tr("Pixels"));
   else
-    m_unitLabel->setText(Preferences::instance()->getCameraUnits());
+    m_unitLabel->setText(
+        unitTrMap.value(Preferences::instance()->getCameraUnits()));
 }
 
 void CameraSettingsWidget::loadPresetList() {
@@ -580,9 +595,14 @@ void CameraSettingsWidget::setFields(const TCamera *camera) {
   updatePresetListOm();
 }
 
-void CameraSettingsWidget::getFields(TCamera *camera) {
+bool CameraSettingsWidget::getFields(TCamera *camera) {
+  TDimensionD old_sz = camera->getSize();
+  TDimension old_res = camera->getRes();
+
+  if (old_sz == getSize() && old_res == getRes()) return false;
   camera->setSize(getSize());
   camera->setRes(getRes());
+  return true;
 }
 
 TDimensionD CameraSettingsWidget::getSize() const {
@@ -943,8 +963,8 @@ double CameraSettingsWidget::aspectRatioStringToValue(const QString &s) {
   }
   int i = s.indexOf("/");
   if (i <= 0 || i + 1 >= s.length()) return s.toDouble();
-  int num           = s.left(i).toInt();
-  int den           = s.mid(i + 1).toInt();
+  int num = s.left(i).toInt();
+  int den = s.mid(i + 1).toInt();
   if (den <= 0) den = 1;
   return (double)num / (double)den;
 }

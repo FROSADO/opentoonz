@@ -5,6 +5,8 @@
 
 #include "toonz/studiopalette.h"
 #include "toonz/tproject.h"
+#include "toonzqt/dvdialog.h"
+#include "saveloadqsettings.h"
 
 #include <QTreeWidget>
 #include <QSplitter>
@@ -27,6 +29,10 @@ class PalettesScanPopup;
 class TXsheetHandle;
 class TXshLevelHandle;
 class PaletteViewer;
+namespace DVGui {
+class IntField;
+}
+
 //=============================================================================
 //!	The StudioPaletteTreeViewer class provides an object to view and manage
 //! palettes files.
@@ -58,6 +64,8 @@ class DVAPI StudioPaletteTreeViewer final : public QTreeWidget,
   QIcon m_studioPaletteIcon;
   // keep the checked item list in order to avoid multiple check
   QSet<QTreeWidgetItem *> m_openedItems;
+
+  QPoint m_startPos;
 
 public:
   StudioPaletteTreeViewer(QWidget *parent, TPaletteHandle *studioPaletteHandle,
@@ -172,7 +180,9 @@ protected:
   void createMenuAction(QMenu &menu, const char *id, QString name,
                         const char *slot);
   /*! If button left is pressed start drag and drop. */
+  void mousePressEvent(QMouseEvent *event) override;
   void mouseMoveEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
   /*! If path related to current item exist and is a palette execute drag. */
   void startDragDrop();
   /*! Verify drag enter data, if it has an url and it's path is a palette or
@@ -203,7 +213,8 @@ protected:
                 allows to show and modify current studio palette selected in
    tree.
 */
-class DVAPI StudioPaletteViewer final : public QSplitter {
+class DVAPI StudioPaletteViewer final : public QSplitter,
+                                        public SaveLoadQSettings {
   Q_OBJECT
 
   StudioPaletteTreeViewer *m_studioPaletteTreeViewer;
@@ -221,6 +232,22 @@ public:
 
   int getViewMode() const;
   void setViewMode(int mode);
+
+  // SaveLoadQSettings
+  virtual void save(QSettings &settings) const override;
+  virtual void load(QSettings &settings) override;
+};
+
+//-----------------------------------------------------------------------------
+
+class AdjustPaletteDialog final : public DVGui::Dialog {
+  Q_OBJECT
+private:
+  DVGui::IntField *m_tolerance;
+
+public:
+  int getTolerance();
+  AdjustPaletteDialog();
 };
 
 #endif  // STUDIOPALETTEVIEWER_H

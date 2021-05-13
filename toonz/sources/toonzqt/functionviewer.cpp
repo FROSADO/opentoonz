@@ -101,7 +101,7 @@ FunctionViewer::FunctionViewer(QWidget *parent, Qt::WFlags flags)
   //----
   m_treeView->resize(150, m_treeView->size().height());
   m_treeView->setMinimumWidth(0);
-  m_treeView->setIconSize(QSize(21, 17));
+  m_treeView->setIconSize(QSize(21, 18));
 
   FunctionTreeModel *ftModel =
       dynamic_cast<FunctionTreeModel *>(m_treeView->model());
@@ -172,11 +172,11 @@ FunctionViewer::FunctionViewer(QWidget *parent, Qt::WFlags flags)
   bool ret = true;
   ret      = ret && connect(m_toolbar, SIGNAL(numericalColumnToggled()), this,
                        SLOT(toggleMode()));
-  ret = ret && connect(ftModel, SIGNAL(activeChannelsChanged()),
+  ret      = ret && connect(ftModel, SIGNAL(activeChannelsChanged()),
                        m_functionGraph, SLOT(update()));
-  ret = ret && connect(ftModel, SIGNAL(activeChannelsChanged()),
+  ret      = ret && connect(ftModel, SIGNAL(activeChannelsChanged()),
                        m_numericalColumns, SLOT(updateAll()));
-  ret = ret && connect(ftModel, SIGNAL(curveChanged(bool)), m_treeView,
+  ret      = ret && connect(ftModel, SIGNAL(curveChanged(bool)), m_treeView,
                        SLOT(update()));
   ret = ret && connect(ftModel, SIGNAL(curveChanged(bool)), m_functionGraph,
                        SLOT(update()));
@@ -241,10 +241,18 @@ void FunctionViewer::showEvent(QShowEvent *) {
           ret;
   }
 
-  if (m_frameHandle)
+  if (m_frameHandle) {
     ret = connect(m_frameHandle, SIGNAL(frameSwitched()), this,
                   SLOT(propagateExternalSetFrame())) &&
           ret;
+
+    ret = connect(m_frameHandle, SIGNAL(triggerNextKeyframe(QWidget *)),
+                  m_toolbar, SLOT(onNextKeyframe(QWidget *))) &&
+          ret;
+    ret = connect(m_frameHandle, SIGNAL(triggerPrevKeyframe(QWidget *)),
+                  m_toolbar, SLOT(onPrevKeyframe(QWidget *))) &&
+          ret;
+  }
 
   if (m_objectHandle) {
     ret = connect(m_objectHandle, SIGNAL(objectSwitched()), this,
@@ -303,7 +311,10 @@ void FunctionViewer::showEvent(QShowEvent *) {
 
 void FunctionViewer::hideEvent(QHideEvent *) {
   if (m_xshHandle) m_xshHandle->disconnect(this);
-  if (m_frameHandle) m_frameHandle->disconnect(this);
+  if (m_frameHandle) {
+    m_frameHandle->disconnect(this);
+    m_frameHandle->disconnect(m_toolbar);
+  }
   if (m_objectHandle) m_objectHandle->disconnect(this);
   if (m_fxHandle) m_fxHandle->disconnect(this);
   if (m_sceneHandle) m_sceneHandle->disconnect(this);
@@ -375,6 +386,8 @@ void FunctionViewer::setXsheetHandle(TXsheetHandle *xshHandle) {
 
   m_xshHandle = xshHandle;
   m_segmentViewer->setXsheetHandle(xshHandle);
+  m_treeView->setXsheetHandle(xshHandle);
+  m_numericalColumns->setXsheetHandle(xshHandle);
 
   if (m_xshHandle && isVisible()) {
     TXsheet *xsh = m_xshHandle->getXsheet();
@@ -582,7 +595,10 @@ void FunctionViewer::onStageObjectChanged(bool isDragging) {
   static_cast<FunctionTreeModel *>(m_treeView->model())
       ->setCurrentStageObject(obj);
 
-  if (!isDragging) m_treeView->updateAll();
+  if (!isDragging) {
+    m_treeView->updateAll();
+    m_numericalColumns->updateAll();
+  }
 
   m_functionGraph->update();
 }
@@ -592,7 +608,7 @@ void FunctionViewer::onStageObjectChanged(bool isDragging) {
 void FunctionViewer::onFxSwitched() {
   TFx *fx              = m_fxHandle->getFx();
   TZeraryColumnFx *zfx = dynamic_cast<TZeraryColumnFx *>(fx);
-  if (zfx) fx          = zfx->getZeraryFx();
+  if (zfx) fx = zfx->getZeraryFx();
   static_cast<FunctionTreeModel *>(m_treeView->model())->setCurrentFx(fx);
   m_treeView->updateAll();
   m_functionGraph->update();
@@ -712,6 +728,9 @@ bool FunctionViewer::isExpressionPageActive() {
 
 void FunctionViewer::save(QSettings &settings) const {
   settings.setValue("toggleStatus", m_toggleStatus);
+  settings.setValue("showIbtwnValuesInSheet",
+                    m_numericalColumns->isIbtwnValueVisible());
+  settings.setValue("syncSize", m_numericalColumns->isSyncSize());
 }
 
 //----------------------------------------------------------------------------
@@ -721,4 +740,26 @@ void FunctionViewer::load(QSettings &settings) {
   if (toggleStatus.canConvert(QVariant::Int)) {
     m_toggleStatus = toggleStatus.toInt();
   }
+
+  bool ibtwnVisible = settings
+                          .value("showIbtwnValuesInSheet",
+                                 m_numericalColumns->isIbtwnValueVisible())
+                          .toBool();
+  m_numericalColumns->setIbtwnValueVisible(ibtwnVisible);
+
+  bool syncSize =
+      settings.value("syncSize", m_numericalColumns->isSyncSize()).toBool();
+  m_numericalColumns->setSyncSize(syncSize);
+}
+
+//-----------------------------------------------------------------------------
+
+QColor FunctionViewer::getCurrentTextColor() const {
+  // get colors
+  TPixel currentColumnPixel;
+  Preferences::instance()->getCurrentColumnData(currentColumnPixel);
+  QColor currentColumnColor((int)currentColumnPixel.r,
+                            (int)currentColumnPixel.g,
+                            (int)currentColumnPixel.b, 255);
+  return currentColumnColor;
 }

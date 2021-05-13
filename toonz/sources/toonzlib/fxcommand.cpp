@@ -35,7 +35,6 @@
 // tcg includes
 #include "tcg/tcg_macros.h"
 #include "tcg/tcg_base.h"
-#include "tcg/tcg_function_types.h"
 
 #include <memory>
 
@@ -141,7 +140,7 @@ void showFx(TXsheet *xsh, TFx *fx) {
   fx->getAttributes()->setIsOpened(xsh->getFxDag()->getDagGridDimension() == 0);
 
   if (TZeraryColumnFx *zcfx = dynamic_cast<TZeraryColumnFx *>(fx))
-    fx                                       = zcfx->getZeraryFx();
+    fx = zcfx->getZeraryFx();
   fx->getAttributes()->passiveCacheDataIdx() = -1;
 }
 
@@ -589,9 +588,8 @@ template <typename Pred>
 TFx *FxCommandUndo::leftmostConnectedFx(TFx *fx, Pred pred) {
   assert(fx);
 
-  fx = rightmostConnectedFx(
-      fx, pred);  // The rightmost fx should be discovered first,
-                  // then, we'll descend from that
+  fx = rightmostConnectedFx(fx, pred);  // The rightmost fx should be discovered
+                                        // first, then, we'll descend from that
   do {
     fx = ::getActualIn(fx);
 
@@ -630,7 +628,7 @@ namespace {
 struct True_pred {
   bool operator()(TFx *fx) { return true; }
 };
-}
+}  // namespace
 
 TFx *FxCommandUndo::leftmostConnectedFx(TFx *fx) {
   return leftmostConnectedFx(fx, ::True_pred());
@@ -743,9 +741,6 @@ namespace {
 bool containsInputFx(const QList<TFxP> &fxs, const TFxCommand::Link &link) {
   return fxs.contains(link.m_inputFx);
 }
-typedef tcg::function<bool (*)(const QList<TFxP> &, const TFxCommand::Link &),
-                      containsInputFx>
-    ContainsInputFx_fun;
 
 }  // namespace
 
@@ -798,7 +793,9 @@ void InsertFxUndo::initialize(const TFxP &newFx, int row, int col) {
         m_selectedLinks.end());
     m_selectedLinks.erase(
         std::remove_if(m_selectedLinks.begin(), m_selectedLinks.end(),
-                       tcg::bind1st(::ContainsInputFx_fun(), m_selectedFxs)),
+                       [this](const TFxCommand::Link &link) {
+                         return containsInputFx(m_selectedFxs, link);
+                       }),
         m_selectedLinks.end());
 
     // Build an fx for each of the specified inputs
@@ -919,6 +916,9 @@ void TFxCommand::insertFx(TFx *newFx, const QList<TFxP> &fxs,
                           const QList<Link> &links, TApplication *app, int col,
                           int row) {
   if (!newFx) return;
+
+  if (col < 0)
+    col = 0;  // Normally insert before. In case of camera, insert after
 
   std::unique_ptr<FxCommandUndo> undo(
       new InsertFxUndo(newFx, row, col, fxs, links, app));
@@ -1152,7 +1152,7 @@ void ReplaceFxUndo::initialize() {
   }
 
   TZeraryColumnFx *zcrepfx = dynamic_cast<TZeraryColumnFx *>(repFx);
-  if (zcrepfx) repFx       = zcrepfx->getZeraryFx();
+  if (zcrepfx) repFx = zcrepfx->getZeraryFx();
 
   bool fxHasCol    = has_fx_column(fx);
   bool repfxHasCol = has_fx_column(repFx);
@@ -1163,7 +1163,7 @@ void ReplaceFxUndo::initialize() {
       m_repColumn = new TXshZeraryFxColumn(*zcfx->getColumn());
       m_repColIdx = m_colIdx;
 
-      // Substitute the column's zerary fx with the subsitute one
+      // Substitute the column's zerary fx with the substitute one
       TZeraryColumnFx *repZcfx =
           static_cast<TZeraryColumnFx *>(m_repColumn->getFx());
       repZcfx->setZeraryFx(repFx);
@@ -1862,7 +1862,9 @@ void DeleteLinksUndo::initialize() {
 
   // Remove invalid links
   m_links.erase(std::remove_if(m_links.begin(), m_links.end(),
-                               tcg::bind1st(&locals::isInvalid, fxDag)),
+                               [fxDag](const TFxCommand::Link &link) {
+                                 return locals::isInvalid(fxDag, link);
+                               }),
                 m_links.end());
 
   std::list<TFxCommand::Link>::iterator lt, lEnd(m_links.end());
@@ -1945,7 +1947,7 @@ void DeleteLinksUndo::redo() const {
       outputFx->getInputPort(index)->setFx(0);
   }
 
-  m_xshHandle->notifyXsheetChanged();
+  if (m_isLastInRedoBlock) m_xshHandle->notifyXsheetChanged();
 }
 
 //------------------------------------------------------
@@ -2010,7 +2012,7 @@ void DeleteLinksUndo::undo() const {
     }
   }
 
-  m_xshHandle->notifyXsheetChanged();
+  if (m_isLastInBlock) m_xshHandle->notifyXsheetChanged();
 }
 
 //------------------------------------------------------
@@ -2049,6 +2051,7 @@ static void deleteLinks(const std::list<TFxCommand::Link> &links,
                         TXsheetHandle *xshHandle) {
   std::unique_ptr<FxCommandUndo> undo(new DeleteLinksUndo(links, xshHandle));
   if (undo->isConsistent()) {
+    undo->m_isLastInRedoBlock = false;
     undo->redo();
     TUndoManager::manager()->add(undo.release());
   }
@@ -2240,10 +2243,11 @@ void DeleteFxOrColumnUndo::redo() const {
             ->getParams());  // However, params stored there are NOT cloned.
   }                          // This is fine since we're deleting the column...
 
-  // Peform operation
+  // Perform operation
   FxCommandUndo::removeFxOrColumn(xsh, m_fx.getPointer(), m_colIdx);
 
-  m_xshHandle->notifyXsheetChanged();  // Add the rest...
+  if (m_isLastInRedoBlock)
+    m_xshHandle->notifyXsheetChanged();  // Add the rest...
 }
 
 //-------------------------------------------------------------
@@ -2294,7 +2298,7 @@ void DeleteFxOrColumnUndo::undo() const {
 
     // Re-establish fx links
     DeleteLinksUndo::undo();
-  } else  // Already covered by DeleteLinksUndo::undo()
+  } else if (m_isLastInBlock)  // Already covered by DeleteLinksUndo::undo()
     m_xshHandle->notifyXsheetChanged();  // in the other branch
 }
 
@@ -2325,6 +2329,9 @@ static void deleteFxs(const std::list<TFxP> &fxs, TXsheetHandle *xshHandle,
     std::unique_ptr<FxCommandUndo> undo(
         new DeleteFxOrColumnUndo(*ft, xshHandle, fxHandle));
     if (undo->isConsistent()) {
+      // prevent emiting xsheetChanged signal for every undos which will cause
+      // multiple triggers of preview rendering
+      undo->m_isLastInRedoBlock = false;
       undo->redo();
       TUndoManager::manager()->add(undo.release());
     }
@@ -2375,6 +2382,9 @@ static void deleteColumns(const std::list<int> &columns,
     std::unique_ptr<FxCommandUndo> undo(
         new DeleteFxOrColumnUndo(cols[c]->getIndex(), xshHandle, fxHandle));
     if (undo->isConsistent()) {
+      // prevent emiting xsheetChanged signal for every undos which will cause
+      // multiple triggers of preview rendering
+      undo->m_isLastInRedoBlock = false;
       undo->redo();
       undoManager->add(undo.release());
     }
@@ -2393,8 +2403,7 @@ void TFxCommand::deleteSelection(const std::list<TFxP> &fxs,
                                  TXsheetHandle *xshHandle,
                                  TFxHandle *fxHandle) {
   // Prepare selected fxs - column fxs would be done twice if the corresponding
-  // columns have
-  // been supplied for deletion too
+  // columns have been supplied for deletion too
   ::FilterColumnFxs filterColumnFxs;
 
   std::list<TFxP> filteredFxs(fxs);
@@ -2405,11 +2414,13 @@ void TFxCommand::deleteSelection(const std::list<TFxP> &fxs,
   // Perform deletions
   TUndoManager::manager()->beginBlock();
 
-  deleteColumns(columns, xshHandle, fxHandle);
-  deleteFxs(filteredFxs, xshHandle, fxHandle);
-  deleteLinks(links, xshHandle);
+  if (!columns.empty()) deleteColumns(columns, xshHandle, fxHandle);
+  if (!filteredFxs.empty()) deleteFxs(filteredFxs, xshHandle, fxHandle);
+  if (!links.empty()) deleteLinks(links, xshHandle);
 
   TUndoManager::manager()->endBlock();
+  // emit xsheetChanged once here
+  xshHandle->notifyXsheetChanged();
 }
 
 //**********************************************************************
@@ -2500,14 +2511,6 @@ void UndoPasteFxs::initialize(const std::map<TFx *, int> &zeraryFxColumnSize,
         fx->renamePort(qPortName.toStdString(), qNewPortName.toStdString());
       }
     }
-
-    static bool circularSubxsheet(TXsheet *xsh, const TXshColumnP &col) {
-      return xsh->checkCircularReferences(col.getPointer());
-    }
-
-    static void push_back(std::vector<TFx *> &fxs, TFx *fx) {
-      fxs.push_back(fx);
-    }
   };
 
   TXsheet *xsh    = m_xshHandle->getXsheet();
@@ -2574,6 +2577,10 @@ void UndoPasteFxs::initialize(const std::map<TFx *, int> &zeraryFxColumnSize,
         int ip, ipCount = macroFx->getInputPortCount();
         for (ip = 0; ip != ipCount; ++ip)
           locals::renamePort(macroFx, ip, oldFxId, newFxId);
+        // node position of the macrofx is defined by dag-pos of inner fxs.
+        // so we need to reset them here or pasted node will be at the same
+        // position as the copied one.
+        locals::buildDagPos(inFx, inFx, copyDagPos, addOffset);
       }
     }
 
@@ -2584,9 +2591,12 @@ void UndoPasteFxs::initialize(const std::map<TFx *, int> &zeraryFxColumnSize,
   }
 
   // Filter columns
-  m_columns.erase(std::remove_if(m_columns.begin(), m_columns.end(),
-                                 tcg::bind1st(&locals::circularSubxsheet, xsh)),
-                  m_columns.end());
+  auto const circularSubxsheet = [xsh](const TXshColumnP &col) -> bool {
+    return xsh->checkCircularReferences(col.getPointer());
+  };
+  m_columns.erase(
+      std::remove_if(m_columns.begin(), m_columns.end(), circularSubxsheet),
+      m_columns.end());
 
   // Initialize columns
   std::list<TXshColumnP>::const_iterator ct, cEnd(m_columns.end());
@@ -2602,7 +2612,7 @@ void UndoPasteFxs::initialize(const std::map<TFx *, int> &zeraryFxColumnSize,
   std::vector<TFx *> fxs;
   fxs.reserve(m_fxs.size() + m_columns.size());
 
-  for_each_fx(tcg::bind1st(&locals::push_back, fxs));
+  for_each_fx([&fxs](TFx *fx) { fxs.push_back(fx); });
 
   // We need to store input links for these fxs
   size_t f, fCount = fxs.size();
@@ -2792,9 +2802,9 @@ void UndoAddPasteFxs::initialize(TFx *inFx) {
   m_linkIn = TFxCommand::Link(inFx, ifx, 0);
 
   // Furthermore, clone the group stack from inFx into each inserted fx
-  typedef tcg::function<void (*)(TFx *, TFx *), FxCommandUndo::cloneGroupStack>
-      clone_fun;
-  for_each_fx(tcg::bind1st(clone_fun(), inFx));
+  auto const clone_fun =
+      static_cast<void (*)(TFx *, TFx *)>(FxCommandUndo::cloneGroupStack);
+  for_each_fx([inFx, clone_fun](TFx *toFx) { clone_fun(inFx, toFx); });
 }
 
 //------------------------------------------------------
@@ -2807,11 +2817,11 @@ void UndoAddPasteFxs::redo() const {
     FxCommandUndo::attach(xsh, m_linkIn, false);
 
     // Copiare l'indice di gruppo dell'fx di input
-    typedef tcg::function<void (*)(TFx *, TFx *),
-                          FxCommandUndo::copyGroupEditLevel>
-        copy_fun;
-    for_each_fx(
-        tcg::binder1st<copy_fun>(copy_fun(), m_linkIn.m_inputFx.getPointer()));
+    auto const copy_fun =
+        static_cast<void (*)(TFx *, TFx *)>(FxCommandUndo::copyGroupEditLevel);
+    for_each_fx([this, copy_fun](TFx *toFx) {
+      copy_fun(m_linkIn.m_inputFx.getPointer(), toFx);
+    });
   }
 
   UndoPasteFxs::redo();
@@ -3020,11 +3030,14 @@ void UndoReplacePasteFxs::undo() const {
   // Remove m_lastFx's output connections - UndoAddPasteFxs would try to
   // redirect them to the replaced fx's input (due to the 'blind' detach
   // command)
-  int ol, olCount = m_rightmostFx->getOutputConnectionCount();
-  for (ol = olCount - 1; ol >= 0; --ol)
-    if (TFxPort *port = m_rightmostFx->getOutputConnection(ol)) port->setFx(0);
+  if (m_rightmostFx) {
+    int ol, olCount = m_rightmostFx->getOutputConnectionCount();
+    for (ol = olCount - 1; ol >= 0; --ol)
+      if (TFxPort *port = m_rightmostFx->getOutputConnection(ol))
+        port->setFx(0);
 
-  fxDag->removeFromXsheet(m_rightmostFx);
+    fxDag->removeFromXsheet(m_rightmostFx);
+  }
 
   // Reverse the applied commands. Again, the order prevents 'bumped' dag
   // positions
@@ -3176,8 +3189,12 @@ void UndoDisconnectFxs::undo() const {
   FxDag *fxDag = xsh->getFxDag();
 
   // Restore the old links
-  tcg::binder1st<LinkFun> attacher(&UndoDisconnectFxs::attach, xsh);
-  tcg::binder1st<LinkFun> xshDetacher(&UndoDisconnectFxs::detachXsh, xsh);
+  auto const attacher = [xsh](const TFxCommand::Link &link) {
+    return UndoDisconnectFxs::attach(xsh, link);
+  };
+  auto const xshDetacher = [xsh](const TFxCommand::Link &link) {
+    return UndoDisconnectFxs::detachXsh(xsh, link);
+  };
 
   std::for_each(m_undoLinksIn.begin(), m_undoLinksIn.end(), attacher);
   std::for_each(m_undoLinksOut.begin(), m_undoLinksOut.end(), attacher);
@@ -3322,8 +3339,9 @@ void UndoConnectFxs::undo() const {
   FxCommandUndo::attach(xsh, m_link, false);
 
   // Restore the old fxs' group data
-  tcg::function<void (GroupData::*)() const, &GroupData::restore> restore_fun;
-  std::for_each(m_undoGroupDatas.begin(), m_undoGroupDatas.end(), restore_fun);
+  for (auto const &groupData : m_undoGroupDatas) {
+    groupData.restore();
+  }
 
   UndoDisconnectFxs::undo();
 }

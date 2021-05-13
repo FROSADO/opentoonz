@@ -11,6 +11,7 @@
 
 #include "toonz/preferences.h"
 #include "toonzqt/lutcalibrator.h"
+#include "toonzqt/gutil.h"
 #include <QPushButton>
 #include <QDialog>
 
@@ -149,8 +150,8 @@ void RGBHistoGraph::setValues() {
   imgPainter.setCompositionMode(QPainter::CompositionMode_Plus);
 
   for (int chan = 0; chan < 3; chan++) {
-    imgPainter.setPen((chan == 0) ? Qt::red
-                                  : (chan == 1) ? Qt::green : Qt::blue);
+    imgPainter.setPen((chan == 0) ? Qt::red : (chan == 1) ? Qt::green
+                                                          : Qt::blue);
 
     for (int i = 0; i < COMBOHIST_RESOLUTION_W; i++) {
       int v = m_rgbValues[chan][i];
@@ -248,8 +249,9 @@ ChannelHisto::ChannelHisto(int channelIndex, int *channelValue,
   QPushButton *showAlphaChannelButton = 0;
   if (channelIndex == 3) {
     showAlphaChannelButton = new QPushButton("", this);
-    showAlphaChannelButton->setObjectName("FxSettingsPreviewShowButton");
+    showAlphaChannelButton->setObjectName("menuToggleButton");
     showAlphaChannelButton->setFixedSize(15, 15);
+    showAlphaChannelButton->setIcon(createQIcon("menu_toggle"));
     showAlphaChannelButton->setCheckable(true);
     showAlphaChannelButton->setChecked(false);
     showAlphaChannelButton->setFocusPolicy(Qt::NoFocus);
@@ -284,7 +286,7 @@ ChannelHisto::ChannelHisto(int channelIndex, int *channelValue,
 
 //-----------------------------------------------------------------------------
 /*! update the picked color's channel value
-*/
+ */
 void ChannelHisto::showCurrentChannelValue(int val) {
   m_histogramGraph->showCurrentChannelValue(val);
 }
@@ -321,7 +323,6 @@ void ComboHistoRGBLabel::paintEvent(QPaintEvent *pe) {
     p.drawRect(bgRect);
     return;
   }
-
   if (LutManager::instance()->isValid()) {
     QColor convertedColor(m_color);
     LutManager::instance()->convert(convertedColor);

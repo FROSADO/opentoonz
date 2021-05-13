@@ -6,6 +6,7 @@
 #include "menubarcommandids.h"
 #include "columnselection.h"
 #include "tapp.h"
+#include "expressionreferencemanager.h"
 
 // TnzQt includes
 #include "toonzqt/tselectionhandle.h"
@@ -36,6 +37,8 @@
 #include "toonz/tcamera.h"
 #include "toonz/tstageobjectspline.h"
 #include "toonz/fxcommand.h"
+#include "toonz/preferences.h"
+#include "toonz/tstageobjectid.h"
 
 // TnzBase includes
 #include "tfx.h"
@@ -50,9 +53,7 @@
 // Qt includes
 #include <QApplication>
 #include <QClipboard>
-
-// tcg includes
-#include "tcg/tcg_function_types.h"
+#include <QSet>
 
 #include <memory>
 
@@ -61,11 +62,6 @@
 //*************************************************************************
 
 namespace {
-
-bool filterNegatives(int c) { return (c < 0); }
-typedef tcg::function<bool (*)(int), filterNegatives> filterNegatives_fun;
-
-//-----------------------------------------------------------------------------
 
 bool canRemoveFx(const std::set<TFx *> &leaves, TFx *fx) {
   bool removeFx = false;
@@ -474,7 +470,7 @@ void cloneSubXsheets(TXsheet *xsh) {
 //  PasteColumnsUndo
 //-----------------------------------------------------------------------------
 
-class PasteColumnsUndo final : public TUndo {
+class PasteColumnsUndo : public TUndo {
   std::set<int> m_indices;
   StageObjectsData *m_data;
   QMap<TFxPort *, TFx *> m_columnLinks;
@@ -543,10 +539,13 @@ class DeleteColumnsUndo final : public TUndo {
   QMap<TStageObjectId, TStageObjectId> m_columnObjParents;
 
   mutable std::unique_ptr<StageObjectsData> m_data;
+  bool m_onlyColumns;
 
 public:
-  DeleteColumnsUndo(const std::set<int> &indices)
-      : m_indices(indices), m_data(new StageObjectsData) {
+  DeleteColumnsUndo(const std::set<int> &indices, bool onlyColumns)
+      : m_indices(indices)
+      , m_data(new StageObjectsData)
+      , m_onlyColumns(onlyColumns) {
     TApp *app    = TApp::instance();
     TXsheet *xsh = app->getCurrentXsheet()->getXsheet();
 
@@ -601,7 +600,7 @@ public:
     m_data->storeColumnFxs(m_indices, xsh, 0);
 
     std::set<int> indices = m_indices;
-    deleteColumnsWithoutUndo(&indices);
+    deleteColumnsWithoutUndo(&indices, m_onlyColumns);
   }
 
   void undo() const override {
@@ -743,7 +742,14 @@ void ColumnCmd::insertEmptyColumns(const std::set<int> &indices,
                                    bool insertAfter) {
   // Filter out all less than 0 indices (in particular, the 'camera' column
   // in the Toonz derivative product "Tab")
-  std::vector<int> positiveIndices(indices.lower_bound(0), indices.end());
+  std::vector<int> positiveIndices(indices.begin(), indices.end());
+  if (positiveIndices[0] < 0) {
+    if (!insertAfter) return;
+    // If inserting after on camera column, change it to insert before on column
+    // 1
+    positiveIndices[0] = 0;
+    insertAfter        = false;
+  }
   if (positiveIndices.empty()) return;
 
   std::unique_ptr<ColumnCommandUndo> undo(
@@ -773,8 +779,9 @@ static void copyColumns_internal(const std::set<int> &indices) {
 
   TXsheet *xsh = TApp::instance()->getCurrentXsheet()->getXsheet();
 
-  data->storeColumns(indices, xsh, StageObjectsData::eDoClone |
-                                       StageObjectsData::eResetFxDagPositions);
+  data->storeColumns(
+      indices, xsh,
+      StageObjectsData::eDoClone | StageObjectsData::eResetFxDagPositions);
   data->storeColumnFxs(
       indices, xsh,
       StageObjectsData::eDoClone | StageObjectsData::eResetFxDagPositions);
@@ -809,10 +816,11 @@ void ColumnCmd::pasteColumns(std::set<int> &indices,
 
 void ColumnCmd::deleteColumns(std::set<int> &indices, bool onlyColumns,
                               bool withoutUndo) {
+  indices.erase(-1);  // Ignore camera column
   if (indices.empty()) return;
 
-  if (!withoutUndo && !onlyColumns)
-    TUndoManager::manager()->add(new DeleteColumnsUndo(indices));
+  if (!withoutUndo)
+    TUndoManager::manager()->add(new DeleteColumnsUndo(indices, onlyColumns));
 
   deleteColumnsWithoutUndo(&indices, onlyColumns);
   TApp::instance()->getCurrentScene()->setDirtyFlag(true);
@@ -822,10 +830,10 @@ void ColumnCmd::deleteColumns(std::set<int> &indices, bool onlyColumns,
 // deleteColumn
 //=============================================================================
 
-void ColumnCmd::deleteColumn(int index) {
+void ColumnCmd::deleteColumn(int index, bool onlyColumns) {
   std::set<int> ii;
   ii.insert(index);
-  ColumnCmd::deleteColumns(ii, false, false);
+  ColumnCmd::deleteColumns(ii, onlyColumns, false);
 }
 
 //=============================================================================
@@ -840,7 +848,7 @@ static void cutColumnsWithoutUndo(std::set<int> *indices) {
 void ColumnCmd::cutColumns(std::set<int> &indices) {
   if (indices.empty()) return;
 
-  TUndoManager::manager()->add(new DeleteColumnsUndo(indices));
+  TUndoManager::manager()->add(new DeleteColumnsUndo(indices, false));
 
   cutColumnsWithoutUndo(&indices);
   TApp::instance()->getCurrentScene()->setDirtyFlag(true);
@@ -961,8 +969,8 @@ void ColumnCmd::resequence(int index) {
   assert(!cell.isEmpty());
   TXshChildLevel *xl = cell.m_level->getChildLevel();
   assert(xl);
-  TXsheet *childXsh              = xl->getXsheet();
-  int frameCount                 = childXsh->getFrameCount();
+  TXsheet *childXsh = xl->getXsheet();
+  int frameCount    = childXsh->getFrameCount();
   if (frameCount < 1) frameCount = 1;
 
   TUndoManager::manager()->add(new ResequenceUndo(index, frameCount));
@@ -1000,7 +1008,7 @@ public:
   void redo() const override {
     TXsheet *xsh = TApp::instance()->getCurrentXsheet()->getXsheet();
     xsh->insertColumn(m_columnIndex);
-    int frameCount                 = m_childLevel->getXsheet()->getFrameCount();
+    int frameCount = m_childLevel->getXsheet()->getFrameCount();
     if (frameCount < 1) frameCount = 1;
     for (int r = 0; r < frameCount; r++)
       xsh->setCell(r, m_columnIndex,
@@ -1196,6 +1204,160 @@ void ColumnCmd::clearCells(int index) {
 }
 
 //=============================================================================
+// checkExpressionReferences
+//=============================================================================
+// - If onlyColumns is true, it means that only columns with specified indices
+// will be removed.
+// - If onlyColumns is false, it means that the relevant pegbars will be removed
+// as well (when collapsing collumns).
+// - Note that relevant Fxs will be removed / collapsed regardless of
+// onlyColumns.
+// - When checkInvert is true, check references both side from the main xsheet
+// and the child xsheet when collapsing columns.
+
+bool ColumnCmd::checkExpressionReferences(const std::set<int> &indices,
+                                          bool onlyColumns, bool checkInvert) {
+  if (!Preferences::instance()->isModifyExpressionOnMovingReferencesEnabled())
+    return true;
+
+  TApp *app    = TApp::instance();
+  TXsheet *xsh = app->getCurrentXsheet()->getXsheet();
+
+  // check if fxs will be deleted
+  QSet<int> colIdsToBeDeleted;
+  QSet<TFx *> fxsToBeDeleted;
+  // store column fxs to be deleted
+  std::set<TFx *> leaves;
+  for (auto index : indices) {
+    if (index < 0) continue;
+    TXshColumn *column = xsh->getColumn(index);
+    if (!column) continue;
+    colIdsToBeDeleted.insert(index);
+    TFx *fx = column->getFx();
+    if (fx) {
+      leaves.insert(fx);
+      TZeraryColumnFx *zcfx = dynamic_cast<TZeraryColumnFx *>(fx);
+      if (zcfx) fxsToBeDeleted.insert(zcfx->getZeraryFx());
+    }
+  }
+
+  // store relevant fxs which will be deleted along with the columns
+  TFxSet *fxSet = xsh->getFxDag()->getInternalFxs();
+  for (int i = 0; i < fxSet->getFxCount(); i++) {
+    TFx *fx = fxSet->getFx(i);
+    if (canRemoveFx(leaves, fx)) fxsToBeDeleted.insert(fx);
+  }
+
+  // store object ids which will be duplicated in the child xsheet on collapse
+  QList<TStageObjectId> objIdsToBeDuplicated;
+  if (checkInvert && !onlyColumns) {
+    for (auto index : indices) {
+      TStageObjectId id =
+          xsh->getStageObjectParent(TStageObjectId::ColumnId(index));
+      // store pegbars/cameras connected to the columns
+      while (id.isPegbar() || id.isCamera()) {
+        if (!objIdsToBeDuplicated.contains(id)) objIdsToBeDuplicated.append(id);
+        id = xsh->getStageObjectParent(id);
+      }
+    }
+  }
+
+  return ExpressionReferenceManager::instance()->checkReferenceDeletion(
+      colIdsToBeDeleted, fxsToBeDeleted, objIdsToBeDuplicated, checkInvert);
+}
+
+//-----------------------------------------------------------------------------
+
+bool ColumnCmd::checkExpressionReferences(const std::set<int> &indices,
+                                          const std::set<TFx *> &fxs,
+                                          bool onlyColumns, bool checkInvert) {
+  if (!Preferences::instance()->isModifyExpressionOnMovingReferencesEnabled())
+    return true;
+
+  TApp *app    = TApp::instance();
+  TXsheet *xsh = app->getCurrentXsheet()->getXsheet();
+
+  // check if fxs will be deleted
+  QSet<int> colIdsToBeDeleted;
+  QSet<TFx *> fxsToBeDeleted;
+  for (auto index : indices) {
+    if (index < 0) continue;
+    TXshColumn *column = xsh->getColumn(index);
+    if (!column) continue;
+    colIdsToBeDeleted.insert(index);
+    TFx *fx = column->getFx();
+    if (fx) {
+      TZeraryColumnFx *zcfx = dynamic_cast<TZeraryColumnFx *>(fx);
+      if (zcfx) fxsToBeDeleted.insert(zcfx->getZeraryFx());
+    }
+  }
+
+  TFxSet *fxSet = xsh->getFxDag()->getInternalFxs();
+  for (auto fx : fxs) fxsToBeDeleted.insert(fx);
+
+  // store object ids which will be duplicated in the child xsheet on collapse
+  QList<TStageObjectId> objIdsToBeDuplicated;
+  if (checkInvert && !onlyColumns) {
+    for (auto index : indices) {
+      TStageObjectId id =
+          xsh->getStageObjectParent(TStageObjectId::ColumnId(index));
+      // store pegbars/cameras connected to the columns
+      while (id.isPegbar() || id.isCamera()) {
+        if (!objIdsToBeDuplicated.contains(id)) objIdsToBeDuplicated.append(id);
+        id = xsh->getStageObjectParent(id);
+      }
+    }
+  }
+
+  return ExpressionReferenceManager::instance()->checkReferenceDeletion(
+      colIdsToBeDeleted, fxsToBeDeleted, objIdsToBeDuplicated, checkInvert);
+}
+
+//-----------------------------------------------------------------------------
+
+bool ColumnCmd::checkExpressionReferences(
+    const QList<TStageObjectId> &objects) {
+  if (!Preferences::instance()->isModifyExpressionOnMovingReferencesEnabled())
+    return true;
+
+  TApp *app    = TApp::instance();
+  TXsheet *xsh = app->getCurrentXsheet()->getXsheet();
+
+  QSet<int> colIdsToBeDeleted;
+  QSet<TFx *> fxsToBeDeleted;
+  QList<TStageObjectId> objIdsToBeDuplicated;
+
+  // store column fxs to be deleted
+  std::set<TFx *> leaves;
+  for (auto objId : objects) {
+    if (objId.isColumn()) {
+      int index = objId.getIndex();
+      if (index < 0) continue;
+      TXshColumn *column = xsh->getColumn(index);
+      if (!column) continue;
+      colIdsToBeDeleted.insert(index);
+      TFx *fx = column->getFx();
+      if (fx) {
+        leaves.insert(fx);
+        TZeraryColumnFx *zcfx = dynamic_cast<TZeraryColumnFx *>(fx);
+        if (zcfx) fxsToBeDeleted.insert(zcfx->getZeraryFx());
+      }
+    } else
+      objIdsToBeDuplicated.append(objId);
+  }
+
+  // store relevant fxs which will be deleted along with the columns
+  TFxSet *fxSet = xsh->getFxDag()->getInternalFxs();
+  for (int i = 0; i < fxSet->getFxCount(); i++) {
+    TFx *fx = fxSet->getFx(i);
+    if (canRemoveFx(leaves, fx)) fxsToBeDeleted.insert(fx);
+  }
+
+  return ExpressionReferenceManager::instance()->checkReferenceDeletion(
+      colIdsToBeDeleted, fxsToBeDeleted, objIdsToBeDuplicated, true);
+}
+
+//=============================================================================
 
 namespace {
 
@@ -1241,24 +1403,28 @@ public:
     TTool::Viewer *viewer = tool ? tool->getViewer() : nullptr;
     bool viewer_changed   = false;
 
-    for (int i = 0; i < xsh->getColumnCount(); i++) {
-      /*- 空のカラムの場合は飛ばす -*/
-      if (xsh->isColumnEmpty(i)) continue;
-      /*- カラムが取得できなかったら飛ばす -*/
+    int startCol =
+        Preferences::instance()->isXsheetCameraColumnVisible() ? -1 : 0;
+
+    for (int i = startCol; i < xsh->getColumnCount(); i++) {
+      /*- Skip if empty column -*/
+      if (i >= 0 && xsh->isColumnEmpty(i)) continue;
+      /*- Skip if column cannot be obtained -*/
       TXshColumn *column = xsh->getColumn(i);
       if (!column) continue;
-      /*- ターゲットが選択カラムのモードで、選択されていなかった場合は飛ばす -*/
+      /*- Skip if target is in selected column mode and not selected -*/
       bool isSelected = selection && selection->isColumnSelected(i);
       if (m_target == TARGET_SELECTED && !isSelected) continue;
 
       /*-
-       * ターゲットが「カレントカラムより右側」のモードで、iがカレントカラムより左の場合は飛ばす
+       * Skip if target is "right side of current column" mode and i is left of
+       * current column
        * -*/
       if (m_target == TARGET_UPPER && i < cc) continue;
 
-      bool negate = m_target == TARGET_CURRENT && cc != i ||
-                    m_target == TARGET_OTHER && cc == i ||
-                    m_target == TARGET_UPPER && cc == i;
+      bool negate = ((m_target == TARGET_CURRENT && cc != i) ||
+                     (m_target == TARGET_OTHER && cc == i) ||
+                     (m_target == TARGET_UPPER && cc == i));
 
       int cmd = m_cmd;
 
@@ -1289,7 +1455,7 @@ public:
         else
           column->setCamstandVisible(!column->isCamstandVisible());
         if (column->getSoundColumn()) sound_changed = true;
-        viewer_changed                              = true;
+        viewer_changed = true;
       }
       /*TAB
 if(cmd & (CMD_ENABLE_PREVIEW|CMD_DISABLE_PREVIEW|CMD_TOGGLE_PREVIEW))
@@ -1345,3 +1511,22 @@ ColumnsStatusCommand
     c16(MI_LockSelectedColumns, CMD_LOCK, TARGET_SELECTED),
     c17(MI_UnlockSelectedColumns, CMD_UNLOCK, TARGET_SELECTED);
 }  // namespace
+
+//=============================================================================
+// ConvertToVectorUndo
+//-----------------------------------------------------------------------------
+
+// Same in functionality to PasteColumnsUndo; think of it perhaps like
+// pasting the newly created vector column.
+class ConvertToVectorUndo final : public PasteColumnsUndo {
+public:
+  ConvertToVectorUndo(std::set<int> indices) : PasteColumnsUndo(indices){};
+
+  QString getHistoryString() override {
+    return QObject::tr("Convert to Vectors");
+  }
+};
+
+void ColumnCmd::addConvertToVectorUndo(std::set<int> &newColumnIndices) {
+  TUndoManager::manager()->add(new ConvertToVectorUndo(newColumnIndices));
+}

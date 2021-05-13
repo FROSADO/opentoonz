@@ -35,7 +35,7 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../../common/tvrender/tpalette.cpp" line="197"/>
+        <location filename="../../common/tvrender/tpalette.cpp" line="250"/>
         <source>colors</source>
         <translation>цвета</translation>
     </message>
@@ -45,12 +45,11 @@
         <translation>Пропуск кадра.</translation>
     </message>
     <message>
-        <location filename="../../common/tsystem/tfilepath.cpp" line="694"/>
         <source>Malformed frame name</source>
-        <translation>Неправильное имя файла</translation>
+        <translation type="obsolete">Неправильное имя файла</translation>
     </message>
     <message>
-        <location filename="../../include/tundo.h" line="46"/>
+        <location filename="../../include/tundo.h" line="49"/>
         <source>Unidentified Action</source>
         <translation>Нераспознанное действие</translation>
     </message>
@@ -58,12 +57,12 @@
 <context>
     <name>TCenterLineStrokeStyle</name>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="888"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="862"/>
         <source>Constant</source>
         <translation>Постоянная</translation>
     </message>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="921"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="895"/>
         <source>Thickness</source>
         <translation>Толщина</translation>
     </message>
@@ -71,12 +70,12 @@
 <context>
     <name>TRasterImagePatternStrokeStyle</name>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1026"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1000"/>
         <source>Distance</source>
         <translation>Расстояние</translation>
     </message>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1028"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1002"/>
         <source>Rotation</source>
         <translation>Вращение</translation>
     </message>
@@ -84,14 +83,40 @@
 <context>
     <name>TVectorImagePatternStrokeStyle</name>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1470"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1410"/>
         <source>Distance</source>
         <translation>Расстояние</translation>
     </message>
     <message>
-        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1472"/>
+        <location filename="../../common/tvrender/tsimplecolorstyles.cpp" line="1412"/>
         <source>Rotation</source>
         <translation>Вращение</translation>
+    </message>
+</context>
+<context>
+    <name>Tiio::BmpWriterProperties</name>
+    <message>
+        <source>Bits Per Pixel</source>
+        <translation type="vanished">Битов на пиксель</translation>
+    </message>
+    <message>
+        <source>24 bits</source>
+        <translation type="vanished">24 бита</translation>
+    </message>
+    <message>
+        <source>8 bits (Greyscale)</source>
+        <translation type="vanished">8 бит (оттенки серого)</translation>
+    </message>
+</context>
+<context>
+    <name>Tiio::JpgWriterProperties</name>
+    <message>
+        <source>Quality</source>
+        <translation type="vanished">Качество</translation>
+    </message>
+    <message>
+        <source>Smoothing</source>
+        <translation type="vanished">Сглаживание</translation>
     </message>
 </context>
 </TS>

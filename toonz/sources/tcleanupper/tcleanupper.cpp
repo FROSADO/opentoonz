@@ -224,7 +224,7 @@ int FarmControllerPort;
 TFarmController *FarmController = 0;
 
 string TaskId;
-}
+}  // namespace
 //========================================================================
 //
 // searchLevelsToCleanup
@@ -275,7 +275,7 @@ static void searchLevelsToCleanup(
             continue;
           }
           int ltype = sl->getType();
-          if (ltype == TZP_XSHLEVEL && sl->getScannedPath() != TFilePath() ||
+          if ((ltype == TZP_XSHLEVEL && sl->getScannedPath() != TFilePath()) ||
               ltype == OVL_XSHLEVEL || ltype == TZI_XSHLEVEL) {
             wstring levelName     = sl->getName();
             levelTable[levelName] = sl;
@@ -491,6 +491,13 @@ int main(int argc, char *argv[]) {
   // questo definisce la registry root e inizializza TEnv
   TEnv::setRootVarName(rootVarName);
   TEnv::setSystemVarPrefix(systemVarPrefix);
+  TEnv::setApplicationFileName(argv[0]);
+
+  QCoreApplication::setOrganizationName("OpenToonz");
+  QCoreApplication::setOrganizationDomain("");
+  QCoreApplication::setApplicationName(
+      QString::fromStdString(TEnv::getApplicationName()));
+
   TSystem::hasMainLoop(false);
   int i;
   for (i = 0; i < argc; i++)  // tmsg must be set as soon as it's possible
@@ -527,7 +534,7 @@ int main(int argc, char *argv[]) {
   TVectorImagePatternStrokeStyle::setRootDir(libraryFolder);
   TPalette::setRootDir(libraryFolder);
   TImageStyle::setLibraryDir(libraryFolder);
-  TFilePath cacheRoot                = ToonzFolder::getCacheRootFolder();
+  TFilePath cacheRoot = ToonzFolder::getCacheRootFolder();
   if (cacheRoot.isEmpty()) cacheRoot = TEnv::getStuffDir() + "cache";
   TImageCache::instance()->setRootDir(cacheRoot);
 
@@ -837,9 +844,3 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 //------------------------------------------------------------------------
-
-namespace {
-const char *toonzVersion = "Toonz 7.1";
-}  // namespace
-
-static string getToonzVersion() { return toonzVersion; }

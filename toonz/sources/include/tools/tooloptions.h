@@ -109,7 +109,7 @@ protected:
   QHBoxLayout *m_layout;
 
 public:
-  ToolOptionsBox(QWidget *parent, bool isScrollable = false);
+  ToolOptionsBox(QWidget *parent, bool isScrollable = true);
   ~ToolOptionsBox();
 
   virtual void
@@ -154,15 +154,15 @@ private:
   QHBoxLayout *hLayout() { return m_panel->hLayout(); }
   QLabel *addLabel(TProperty *p);
 
-  void visit(TDoubleProperty *p);
-  void visit(TDoublePairProperty *p);
-  void visit(TIntPairProperty *p);
-  void visit(TIntProperty *p);
-  void visit(TBoolProperty *p);
-  void visit(TStringProperty *p);
-  void visit(TEnumProperty *p);
-  void visit(TStyleIndexProperty *p);
-  void visit(TPointerProperty *p);
+  void visit(TDoubleProperty *p) override;
+  void visit(TDoublePairProperty *p) override;
+  void visit(TIntPairProperty *p) override;
+  void visit(TIntProperty *p) override;
+  void visit(TBoolProperty *p) override;
+  void visit(TStringProperty *p) override;
+  void visit(TEnumProperty *p) override;
+  void visit(TStyleIndexProperty *p) override;
+  void visit(TPointerProperty *p) override;
 };
 
 //***********************************************************************************************
@@ -172,7 +172,8 @@ private:
 class GenericToolOptionsBox : public ToolOptionsBox {
 public:
   GenericToolOptionsBox(QWidget *parent, TTool *tool, TPaletteHandle *pltHandle,
-                        int propertyGroupIdx = 0, ToolHandle *toolHandle = 0);
+                        int propertyGroupIdx = 0, ToolHandle *toolHandle = 0,
+                        bool scrollable = true);
 };
 
 //=============================================================================
@@ -330,8 +331,6 @@ protected:
       QPixmap RotationPixmap READ getRotationPixmap WRITE setRotationPixmap);
   Q_PROPERTY(
       QPixmap PositionPixmap READ getPositionPixmap WRITE setPositionPixmap);
-  Q_PROPERTY(
-      QPixmap ThicknessPixmap READ getThicknessPixmap WRITE setThicknessPixmap);
 
 public:
   IconViewField(QWidget *parent = 0, IconType iconType = Icon_ScalePeg);
@@ -347,10 +346,6 @@ public:
   QPixmap getPositionPixmap() const { return m_pm[Icon_Position]; }
   void setPositionPixmap(const QPixmap &pixmap) {
     m_pm[Icon_Position] = pixmap;
-  }
-  QPixmap getThicknessPixmap() const { return m_pm[Icon_Thickness]; }
-  void setThicknessPixmap(const QPixmap &pixmap) {
-    m_pm[Icon_Thickness] = pixmap;
   }
 
 protected:
@@ -415,7 +410,7 @@ class GeometricToolOptionsBox final : public ToolOptionsBox {
   ToolOptionCombo *m_shapeField;
   ToolOptionCheckbox *m_pencilMode;
   ToolOptionIntSlider *m_miterField;
-  ToolOptionCheckbox *m_snapCheckbox;
+  ToolOptionCheckbox *m_snapCheckbox, *m_smoothCheckbox;
   ToolOptionCombo *m_snapSensitivityCombo;
   TTool *m_tool;
 
@@ -472,6 +467,21 @@ public:
 
 protected slots:
   void onColorModeChanged(int);
+};
+
+//=============================================================================
+//
+// FullColorFillToolOptionsBox
+//
+//=============================================================================
+
+class FullColorFillToolOptionsBox final : public ToolOptionsBox {
+  Q_OBJECT
+
+public:
+  FullColorFillToolOptionsBox(QWidget *parent, TTool *tool,
+                              TPaletteHandle *pltHandle,
+                              ToolHandle *toolHandle);
 };
 
 //=============================================================================
@@ -686,7 +696,7 @@ class ShiftTraceToolOptionBox final : public ToolOptionsBox {
   void resetGhost(int index);
 
 protected:
-  void showEvent(QShowEvent *);
+  void showEvent(QShowEvent *) override;
   void hideEvent(QShowEvent *);
 
 public:

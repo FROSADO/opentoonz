@@ -27,6 +27,7 @@ set(MOC_HEADERS
     ../include/toonzqt/functiontreeviewer.h
     ../include/toonzqt/functionviewer.h
     ../include/toonzqt/fxhistogramrender.h
+    ../include/toonzqt/fxiconmanager.h
     ../include/toonzqt/fxschematicnode.h
     ../include/toonzqt/fxschematicscene.h
     ../include/toonzqt/fxselection.h
@@ -72,6 +73,7 @@ set(MOC_HEADERS
 
 set(HEADERS
     ${MOC_HEADERS}
+    ../include/tools/cursormanager.h
     docklayout.h
     functionpaneltools.h
     fxdata.h
@@ -86,7 +88,6 @@ set(HEADERS
     ../include/toonzqt/dvmimedata.h
     ../include/toonzqt/flipconsoleowner.h
     ../include/toonzqt/freelayout.h
-    ../include/toonzqt/fxiconmanager.h
     ../include/toonzqt/fxtypes.h
     ../include/toonzqt/glwidget_for_highdpi.h
     ../include/toonzqt/lutcalibrator.h
@@ -103,6 +104,7 @@ set(HEADERS
 )
 
 set(SOURCES
+    ../tnztools/cursormanager.cpp
     checkbox.cpp
     colorfield.cpp
     docklayout.cpp
@@ -200,7 +202,9 @@ set(SOURCES
 
 set(RESOURCES toonzqt.qrc)
 
-add_translation(toonzqt ${HEADERS} ${SOURCES})
+if(WITH_TRANSLATION)
+    add_translation(toonzqt ${HEADERS} ${SOURCES})
+endif()
 
 get_target_property(QW_LOC Qt5::Widgets INTERFACE_INCLUDE_DIRECTORIES)
 
@@ -217,7 +221,7 @@ qt5_wrap_cpp(SOURCES ${MOC_HEADERS} OPTIONS ${incs})
 
 add_library(toonzqt SHARED ${HEADERS} ${SOURCES} ${RESOURCES})
 if(BUILD_ENV_APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-install_name,@rpath/libtoonzqt.dylib")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-install_name,@executable_path/libtoonzqt.dylib")
     add_dependencies(toonzqt tnzcore tnzbase tnzext toonzlib sound)
 endif()
 

@@ -3,6 +3,7 @@ set(MOC_HEADERS
     edittoolgadgets.h
     filltool.h
     fullcolorbrushtool.h
+    fullcolorfilltool.h
     plastictool.h
     skeletonsubtools.h
     tooloptionscontrols.h
@@ -58,6 +59,7 @@ set(SOURCES
     filltool.cpp
     fullcolorbrushtool.cpp
     fullcolorerasertool.cpp
+    fullcolorfilltool.cpp
     geometrictool.cpp
     hooktool.cpp
     hookselection.cpp
@@ -107,7 +109,9 @@ set(RESOURCES tnztools.qrc)
 
 qt5_add_resources(SOURCES ${RESOURCES})
 
-add_translation(tnztools ${HEADERS} ${SOURCES})
+if(WITH_TRANSLATION)
+    add_translation(tnztools ${HEADERS} ${SOURCES})
+endif()
 
 qt5_wrap_cpp(SOURCES ${MOC_HEADERS})
 
@@ -117,7 +121,7 @@ add_definitions(
 )
 
 if(BUILD_ENV_APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-install_name,@rpath/libtnztools.dylib")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-install_name,@executable_path/libtnztools.dylib")
     add_dependencies(tnztools tnzcore tnzbase tnzext toonzlib toonzqt)
 endif()
 

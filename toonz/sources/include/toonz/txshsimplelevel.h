@@ -243,6 +243,10 @@ Editable range is contained in \b m_editableRange.
   //!  and assigns the specified level path.
   TImageP createEmptyFrame();
 
+  void initializePalette();
+  void initializeResolutionAndDpi(const TDimension &dim = TDimension(),
+                                  double dpi            = 0);
+
   TDimension getResolution();
 
   TPointD getImageDpi(const TFrameId &fid = TFrameId::NO_FRAME,
@@ -301,6 +305,8 @@ The oldFp is used when the current scene path change...
   //! Renumbers the level frames to the specified fids (fids and this->fids()
   //! must have the same size).
   void renumber(const std::vector<TFrameId> &fids);
+
+  bool isFrameReadOnly(TFrameId fid);
 
 public:
   // Auxiliary files management: hooks, tpl, etc.

@@ -55,6 +55,10 @@ class RowArea final : public QWidget {
   void drawCurrentTimeLine(QPainter &p);
   void drawShiftTraceMarker(QPainter &p);
 
+#if defined(x64)
+  void drawStopMotionCameraIndicator(QPainter &p);
+#endif
+
   DragTool *getDragTool() const;
   void setDragTool(DragTool *dragTool);
 
@@ -97,6 +101,6 @@ protected slots:
   void onPreviewThis();
 };
 
-}  // namespace XsheetGUI;
+}  // namespace XsheetGUI
 
 #endif  // XSHROWVIEWER_H

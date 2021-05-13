@@ -29,9 +29,6 @@
 // Glew include
 #include <GL/glew.h>
 
-// tcg includes
-#include "tcg/tcg_function_types.h"
-
 // Boost includes
 #include <boost/any.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -313,6 +310,8 @@ Suggestions are welcome as this is a tad beyond ridiculous...
             "This system configuration does not support OpenGL Shader "
             "Programs. Shader Fxs will not be able to render."));
         break;
+      default:
+        break;
       }
 
       sentMsg = true;
@@ -474,6 +473,8 @@ void ShaderFx::initialize() {
       case ShaderInterface::ANGLE_UI:
         param->setMeasureName(l_measureNames[ANGLE]);
         break;
+      default:
+        break;
       }
 
       m_params.push_back(param);
@@ -513,6 +514,8 @@ void ShaderFx::initialize() {
       case ShaderInterface::ANGLE_UI:
         param->getX()->setMeasureName(l_measureNames[ANGLE]);
         param->getY()->setMeasureName(l_measureNames[ANGLE]);
+        break;
+      default:
         break;
       }
 
@@ -555,6 +558,8 @@ void ShaderFx::initialize() {
                 *boost::unsafe_any_cast<TPixelParamP>(&m_params.back()));
       break;
     }
+    default:
+      break;
     }
   }
 
@@ -783,6 +788,8 @@ void ShaderFx::bindParameters(QOpenGLShaderProgram *program, double frame) {
           (GLfloat)value.m / 255.0f);
       break;
     }
+    default:
+      break;
     }
   }
 }
@@ -953,12 +960,9 @@ void ShaderFx::doCompute(TTile &tile, double frame,
       }
 
       ~TexturesStorage() {
-        typedef tcg::function<void (ShadingContext::*)(GLuint),
-                              &ShadingContext::unloadTexture>
-            UnloadFunc;
-
-        std::for_each(m_texIds.begin(), m_texIds.end(),
-                      tcg::bind1st(UnloadFunc(), m_ctx));
+        for (auto const &texId : m_texIds) {
+          m_ctx.unloadTexture(texId);
+        }
       }
 
       void load(const TRasterP &ras, GLuint texUnit) {

@@ -17,6 +17,7 @@
 class PaletteViewer;
 class TPaletteHandle;
 class StyleEditor;
+class StopMotionController;
 class TLevel;
 class StudioPaletteViewer;
 class TPanelTitleBarButton;
@@ -25,7 +26,11 @@ class FunctionViewer;
 class FlipBook;
 class ToolOptions;
 class ComboViewerPanel;
+class SceneViewerPanel;
 class FxSettings;
+class VectorGuidedDrawingPane;
+class FxSelection;
+class StageObjectSelection;
 
 //=========================================================
 // PaletteViewerPanel
@@ -37,8 +42,8 @@ class PaletteViewerPanel final : public StyleShortcutSwitchablePanel {
   TPaletteHandle *m_paletteHandle;
   PaletteViewer *m_paletteViewer;
 
-  TPanelTitleBarButton *m_isCurrentButton;
-  bool m_isCurrent;
+  TPanelTitleBarButton *m_freezeButton;
+  bool m_isFrozen;
 
 public:
   PaletteViewerPanel(QWidget *parent);
@@ -48,15 +53,21 @@ public:
 
   void reset() override;
 
+  bool isFrozen() { return m_isFrozen; }
+  void setFrozen(bool frozen) { m_isFrozen = frozen; }
+
 protected:
   void initializeTitleBar();
   bool isActivatableOnEnter() override { return true; }
+  void showEvent(QShowEvent *) override;
+  void hideEvent(QHideEvent *) override;
 
 protected slots:
   void onColorStyleSwitched();
   void onPaletteSwitched();
-  void onCurrentButtonToggled(bool isCurrent);
+  void onFreezeButtonToggled(bool isFrozen);
   void onSceneSwitched();
+  void onPreferenceChanged(const QString &prefName);
 };
 
 //=========================================================
@@ -92,6 +103,12 @@ class StyleEditorPanel final : public TPanel {
 
 public:
   StyleEditorPanel(QWidget *parent);
+
+protected:
+  void showEvent(QShowEvent *) override;
+  void hideEvent(QHideEvent *) override;
+protected slots:
+  void onPreferenceChanged(const QString &prefName);
 };
 
 //=========================================================
@@ -172,6 +189,9 @@ protected slots:
   void onExplodeChild(const QList<TFxP> &);
   void onExplodeChild(QList<TStageObjectId>);
   void onEditObject();
+  void onDeleteFxs(const FxSelection *);
+  void onDeleteStageObjects(const StageObjectSelection *);
+  void onColumnPaste(const QList<TXshColumnP> &);
 };
 
 //=========================================================
@@ -270,6 +290,25 @@ protected:
 };
 
 //=========================================================
+// SceneViewerPanel
+//---------------------------------------------------------
+
+class SceneViewerPanelContainer final : public StyleShortcutSwitchablePanel {
+  Q_OBJECT
+  SceneViewerPanel *m_sceneViewer;
+
+public:
+  SceneViewerPanelContainer(QWidget *parent);
+  // reimplementation of TPanel::widgetInThisPanelIsFocused
+  bool widgetInThisPanelIsFocused() override;
+
+protected:
+  // reimplementation of TPanel::widgetFocusOnEnter
+  void widgetFocusOnEnter() override;
+  void widgetClearFocusOnLeave() override;
+};
+
+//=========================================================
 // FxSettingsPanel
 //---------------------------------------------------------
 
@@ -280,6 +319,20 @@ class FxSettingsPanel final : public TPanel {
 
 public:
   FxSettingsPanel(QWidget *parent);
+  // FxSettings will adjust its size according to the current fx
+  // so we only restore position of the panel.
+  void restoreFloatingPanelState() override;
+};
+
+//=========================================================
+// VectorGuidedDrawingPanel
+//---------------------------------------------------------
+
+class VectorGuidedDrawingPanel final : public TPanel {
+  Q_OBJECT
+
+public:
+  VectorGuidedDrawingPanel(QWidget *parent);
 };
 
 #endif

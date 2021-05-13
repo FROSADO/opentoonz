@@ -52,7 +52,7 @@ TFrameId operator+(const TFrameId &fid, int d) {
 }
 
 //-----------------------------------------------------------------------------
-
+/*
 void doUpdateXSheet(TXshSimpleLevel *sl, std::vector<TFrameId> oldFids,
                     std::vector<TFrameId> newFids, TXsheet *xsh,
                     std::vector<TXshChildLevel *> &childLevels) {
@@ -70,9 +70,8 @@ void doUpdateXSheet(TXshSimpleLevel *sl, std::vector<TFrameId> oldFids,
             cells[i].m_level->getType() == CHILD_XSHLEVEL) {
           TXshChildLevel *level = cells[i].m_level->getChildLevel();
           // make sure we haven't already checked the level
-          if (level &&
-              std::find(childLevels.begin(), childLevels.end(), level) ==
-                  childLevels.end()) {
+          if (level && std::find(childLevels.begin(), childLevels.end(),
+                                 level) == childLevels.end()) {
             childLevels.push_back(level);
             TXsheet *subXsh = level->getXsheet();
             doUpdateXSheet(sl, oldFids, newFids, subXsh, childLevels);
@@ -98,15 +97,17 @@ void doUpdateXSheet(TXshSimpleLevel *sl, std::vector<TFrameId> oldFids,
     }
   }
 }
-
+*/
 //-----------------------------------------------------------------------------
 
-void updateXSheet(TXshSimpleLevel *sl, std::vector<TFrameId> oldFids,
-                  std::vector<TFrameId> newFids) {
+static void updateXSheet(TXshSimpleLevel *sl, std::vector<TFrameId> oldFids,
+                         std::vector<TFrameId> newFids) {
   std::vector<TXshChildLevel *> childLevels;
   TXsheet *xsh =
       TApp::instance()->getCurrentScene()->getScene()->getTopXsheet();
-  doUpdateXSheet(sl, oldFids, newFids, xsh, childLevels);
+  bool changed =
+      ToolUtils::doUpdateXSheet(sl, oldFids, newFids, xsh, childLevels);
+  if (changed) TApp::instance()->getCurrentXsheet()->notifyXsheetChanged();
 }
 
 //=============================================================================
@@ -145,7 +146,7 @@ void makeSpaceForFids(TXshSimpleLevel *sl,
     if (Preferences::instance()->isSyncLevelRenumberWithXsheetEnabled())
       updateXSheet(sl, oldFids, fids);
     sl->renumber(fids);
-	sl->setDirtyFlag(true);
+    sl->setDirtyFlag(true);
   }
 }
 
@@ -250,10 +251,10 @@ bool pasteAreasWithoutUndo(const QMimeData *data, TXshSimpleLevel *sl,
         affine *= sc;
         int i;
         TRectD boxD;
-        if (rects.size() > 0) boxD   = rects[0];
+        if (rects.size() > 0) boxD = rects[0];
         if (strokes.size() > 0) boxD = strokes[0].getBBox();
         for (i = 0; i < rects.size(); i++) boxD += rects[i];
-        for (i     = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
+        for (i = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
         boxD       = affine * boxD;
         TRect box  = ToonzImageUtils::convertWorldToRaster(boxD, ti);
         TPoint pos = box.getP00();
@@ -309,10 +310,10 @@ bool pasteAreasWithoutUndo(const QMimeData *data, TXshSimpleLevel *sl,
         affine *= sc;
         int i;
         TRectD boxD;
-        if (rects.size() > 0) boxD   = rects[0];
+        if (rects.size() > 0) boxD = rects[0];
         if (strokes.size() > 0) boxD = strokes[0].getBBox();
         for (i = 0; i < rects.size(); i++) boxD += rects[i];
-        for (i     = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
+        for (i = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
         boxD       = affine * boxD;
         TRect box  = TRasterImageUtils::convertWorldToRaster(boxD, ri);
         TPoint pos = box.getP00();
@@ -403,8 +404,11 @@ std::map<TFrameId, QString> clearFramesWithoutUndo(
                  "-" + QString::number(it->getNumber());
     TImageCache::instance()->add(id, sl->getFrame(frameId, false));
     clearedFrames[frameId] = id;
+    // empty frame must be created BEFORE erasing frame or it may initialize
+    // palette.
+    TImageP emptyFrame = sl->createEmptyFrame();
     sl->eraseFrame(frameId);
-    sl->setFrame(*it, sl->createEmptyFrame());
+    sl->setFrame(*it, emptyFrame);
   }
   invalidateIcons(sl.getPointer(), frames);
   TApp::instance()->getCurrentLevel()->notifyLevelChange();
@@ -604,13 +608,13 @@ public:
 
         int i;
         TRectD boxD;
-        if (rects.size() > 0) boxD   = rects[0];
+        if (rects.size() > 0) boxD = rects[0];
         if (strokes.size() > 0) boxD = strokes[0].getBBox();
         for (i = 0; i < rects.size(); i++) boxD += rects[i];
-        for (i     = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
-        boxD       = affine * boxD;
-        TRect box  = ToonzImageUtils::convertWorldToRaster(boxD, ti);
-        TPoint pos = box.getP00();
+        for (i = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
+        boxD             = affine * boxD;
+        TRect box        = ToonzImageUtils::convertWorldToRaster(boxD, ti);
+        TPoint pos       = box.getP00();
         TRasterCM32P app = ras;
         TRop::over(ti->getRaster(), app, pos, affine);
         ToolUtils::updateSaveBox(m_level, *it);
@@ -628,9 +632,9 @@ public:
           ToonzScene *scene = TApp::instance()->getCurrentScene()->getScene();
           if (scene) {
             TCamera *camera = scene->getCurrentCamera();
-            TPointD dpi = dpi = camera->getDpi();
-            dpiX              = dpi.x;
-            dpiY              = dpi.y;
+            TPointD dpi     = camera->getDpi();
+            dpiX            = dpi.x;
+            dpiY            = dpi.y;
           } else
             return;
         }
@@ -639,13 +643,13 @@ public:
         affine *= sc;
         int i;
         TRectD boxD;
-        if (rects.size() > 0) boxD   = rects[0];
+        if (rects.size() > 0) boxD = rects[0];
         if (strokes.size() > 0) boxD = strokes[0].getBBox();
         for (i = 0; i < rects.size(); i++) boxD += rects[i];
-        for (i     = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
-        boxD       = affine * boxD;
-        TRect box  = TRasterImageUtils::convertWorldToRaster(boxD, ri);
-        TPoint pos = box.getP00();
+        for (i = 0; i < strokes.size(); i++) boxD += strokes[i].getBBox();
+        boxD             = affine * boxD;
+        TRect box        = TRasterImageUtils::convertWorldToRaster(boxD, ri);
+        TPoint pos       = box.getP00();
         TRasterCM32P app = ras;
         if (app)
           TRop::over(ri->getRaster(), app, ri->getPalette(), pos, affine);
@@ -985,7 +989,7 @@ public:
         updateXSheet(m_sl.getPointer(), newFrames, m_oldLevelFrameId);
       }
       m_sl->renumber(m_oldLevelFrameId);
-	  m_sl->setDirtyFlag(true);
+      m_sl->setDirtyFlag(true);
       TApp::instance()
           ->getPaletteController()
           ->getCurrentLevelPalette()
@@ -1309,8 +1313,8 @@ public:
     m_level->renumber(fids);
     TSelection *selection = TSelection::getCurrent();
     if (selection) selection->selectNone();
-	m_level->setDirtyFlag(true);
-	TApp::instance()->getCurrentLevel()->notifyLevelChange();
+    m_level->setDirtyFlag(true);
+    TApp::instance()->getCurrentLevel()->notifyLevelChange();
   }
   void undo() const override {
     std::vector<TFrameId> fids;
@@ -1725,7 +1729,7 @@ public:
         // TImageCache::instance()->add("UndoInsertEmptyFrames"+QString::number((UINT)this),
         // img);
         TImageCache::instance()->add(
-            "UndoInsertEmptyFrames" + QString::number((uintptr_t) this), img);
+            "UndoInsertEmptyFrames" + QString::number((uintptr_t)this), img);
       }
     }
     m_updateXSheet =
@@ -1735,7 +1739,7 @@ public:
   ~UndoInsertEmptyFrames() {
     // TImageCache::instance()->remove("UndoInsertEmptyFrames"+QString::number((UINT)this));
     TImageCache::instance()->remove("UndoInsertEmptyFrames" +
-                                    QString::number((uintptr_t) this));
+                                    QString::number((uintptr_t)this));
   }
 
   void undo() const override {
@@ -1747,7 +1751,7 @@ public:
       updateXSheet(m_level.getPointer(), newFrames, m_oldFrames);
     }
     m_level->renumber(m_oldFrames);
-	m_level->setDirtyFlag(true);
+    m_level->setDirtyFlag(true);
     TApp::instance()->getCurrentLevel()->notifyLevelChange();
   }
 
@@ -1762,7 +1766,7 @@ public:
       // (TToonzImageP)TImageCache::instance()->get("UndoInsertEmptyFrames"+QString::number((UINT)this),
       // true);
       TToonzImageP image = (TToonzImageP)TImageCache::instance()->get(
-          "UndoInsertEmptyFrames" + QString::number((uintptr_t) this), true);
+          "UndoInsertEmptyFrames" + QString::number((uintptr_t)this), true);
       if (!image) return;
       for (it = m_frames.begin(); it != m_frames.end(); ++it)
         m_level->setFrame(*it, image);
@@ -2039,7 +2043,7 @@ public:
     m_level->renumber(m_oldFrames);
     TSelection *selection = TSelection::getCurrent();
     if (selection) selection->selectNone();
-	m_level->setDirtyFlag(true);
+    m_level->setDirtyFlag(true);
     TApp::instance()->getCurrentLevel()->notifyLevelChange();
   }
   void redo() const override {
@@ -2205,7 +2209,7 @@ public:
       updateXSheet(m_level.getPointer(), newFrames, m_oldFrames);
     }
     m_level->renumber(m_oldFrames);
-	m_level->setDirtyFlag(true);
+    m_level->setDirtyFlag(true);
     TApp::instance()->getCurrentLevel()->notifyLevelChange();
   }
   void redo() const override {
@@ -2226,6 +2230,27 @@ public:
 //=============================================================================
 // duplicate
 //-----------------------------------------------------------------------------
+
+void FilmstripCmd::duplicateFrameWithoutUndo(TXshSimpleLevel *sl,
+                                             TFrameId srcFrame,
+                                             TFrameId targetFrame) {
+  if (srcFrame.isNoFrame() || targetFrame.isNoFrame()) return;
+  if (srcFrame.isEmptyFrame()) return;
+
+  std::set<TFrameId> frames;
+
+  frames.insert(srcFrame);
+  DrawingData *data = new DrawingData();
+  data->setLevelFrames(sl, frames);
+
+  frames.clear();
+  frames.insert(targetFrame);
+
+  bool keepOriginalPalette = true;
+
+  pasteFramesWithoutUndo(data, sl, frames, DrawingData::OVER_SELECTION, true,
+                         keepOriginalPalette);
+}
 
 void FilmstripCmd::duplicate(TXshSimpleLevel *sl, std::set<TFrameId> &frames,
                              bool withUndo) {
@@ -2435,16 +2460,16 @@ public:
                       .arg(QString::fromStdWString(m_level->getName()));
     switch (m_interpolation) {
     case FilmstripCmd::II_Linear:
-      str += QString("Linear Interporation");
+      str += QString("Linear Interpolation");
       break;
     case FilmstripCmd::II_EaseIn:
-      str += QString("Ease In Interporation");
+      str += QString("Ease In Interpolation");
       break;
     case FilmstripCmd::II_EaseOut:
-      str += QString("Ease Out Interporation");
+      str += QString("Ease Out Interpolation");
       break;
     case FilmstripCmd::II_EaseInOut:
-      str += QString("Ease In-Out Interporation");
+      str += QString("Ease In-Out Interpolation");
       break;
     }
     return str;
@@ -2477,25 +2502,27 @@ void FilmstripCmd::inbetweenWithoutUndo(
   TVectorImageP img1 = sl->getFrame(fid1, false);
   if (!img0 || !img1) return;
 
+  enum TInbetween::TweenAlgorithm algorithm;
+  switch (interpolation) {
+  case II_Linear:
+    algorithm = TInbetween::LinearInterpolation;
+    break;
+  case II_EaseIn:
+    algorithm = TInbetween::EaseInInterpolation;
+    break;
+  case II_EaseOut:
+    algorithm = TInbetween::EaseOutInterpolation;
+    break;
+  case II_EaseInOut:
+    algorithm = TInbetween::EaseInOutInterpolation;
+    break;
+  }
+
   TInbetween inbetween(img0, img1);
   int i;
   for (i = ia + 1; i < ib; i++) {
     double t = (double)(i - ia) / (double)(ib - ia);
-    double s = t;
-    // in tutte le interpolazioni : s(0) = 0, s(1) = 1
-    switch (interpolation) {
-    case II_Linear:
-      break;
-    case II_EaseIn:
-      s = t * t;
-      break;  // s'(0) = 0
-    case II_EaseOut:
-      s = t * (2 - t);
-      break;  // s'(1) = 0
-    case II_EaseInOut:
-      s = t * t * (3 - 2 * t);
-      break;  // s'(0) = s'(1) = 0
-    }
+    double s = TInbetween::interpolation(t, algorithm);
 
     TVectorImageP vi = inbetween.tween(s);
     sl->setFrame(fids[i], vi);

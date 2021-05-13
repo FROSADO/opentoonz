@@ -435,7 +435,7 @@ void ParsedPli::setMaxThickness(double maxThickness) {
 };
 
 /* indirect inclusion of <math.h> causes 'abs' to return double on Linux */
-#if defined(LINUX) || (defined(_WIN32) && defined(__GNUC__))
+#if defined(LINUX) || defined(FREEBSD) || (defined(_WIN32) && defined(__GNUC__))
 template <typename T>
 T abs_workaround(T a) {
   return (a > 0) ? a : -a;
@@ -473,7 +473,7 @@ static inline short complement2(USHORT val) {
   return (val & 0x8000) ? -(val & 0x7fff) : (val & 0x7fff);
 }
 
-#if defined(LINUX) || (defined(_WIN32) && defined(__GNUC__))
+#if defined(LINUX) || defined(FREEBSD) || (defined(_WIN32) && defined(__GNUC__))
 #undef abs
 #endif
 
@@ -582,7 +582,7 @@ ParsedPliImp::ParsedPliImp(const TFilePath &filename, bool readInfo)
                                  m_minorVersionNumber);
 
   if (m_majorVersionNumber > 5 ||
-      m_majorVersionNumber == 5 && m_minorVersionNumber >= 8)
+      (m_majorVersionNumber == 5 && m_minorVersionNumber >= 8))
     m_iChan >> m_creator;
 
   if (m_majorVersionNumber < 5) {
@@ -1055,16 +1055,16 @@ inline bool ParsedPliImp::readDinamicData(TINT32 &val, TUINT32 &bufOffs) {
     break;
   case 4:
     if (m_isIrixEndian) {
-      val = m_buf[bufOffs + 3] | (m_buf[bufOffs + 2] << 8) |
-            (m_buf[bufOffs + 1] << 16) | (m_buf[bufOffs] << 24) & 0x7fffffff;
+      val = (m_buf[bufOffs + 3] | (m_buf[bufOffs + 2] << 8) |
+            (m_buf[bufOffs + 1] << 16) | (m_buf[bufOffs] << 24)) & 0x7fffffff;
       if (m_buf[bufOffs] & 0x80) {
         val        = -val;
         isNegative = true;
       }
     } else {
-      val = m_buf[bufOffs] | (m_buf[bufOffs + 1] << 8) |
+      val = (m_buf[bufOffs] | (m_buf[bufOffs + 1] << 8) |
             (m_buf[bufOffs + 2] << 16) |
-            (m_buf[bufOffs + 3] << 24) & 0x7fffffff;
+            (m_buf[bufOffs + 3] << 24)) & 0x7fffffff;
       if (m_buf[bufOffs + 3] & 0x80) {
         val        = -val;
         isNegative = true;

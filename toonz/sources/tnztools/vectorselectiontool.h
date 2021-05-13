@@ -8,6 +8,7 @@
 // TnzTools includes
 #include "tools/strokeselection.h"
 #include "tools/levelselection.h"
+#include "tools/cursors.h"
 
 // TnzCore includes
 #include "tstroke.h"
@@ -149,7 +150,7 @@ public:
   VectorDeformTool(VectorSelectionTool *tool);
   ~VectorDeformTool();
 
-  void applyTransform(FourPoints bbox) override;
+  void applyTransform(FourPoints bbox, bool onFastDragging = false) override;
   void addTransformUndo() override;
 
   /*! Trasform whole level and add undo. */
@@ -222,10 +223,10 @@ class VectorScaleTool final : public VectorDeformTool {
   std::unique_ptr<Scale> m_scale;
 
 public:
-  VectorScaleTool(VectorSelectionTool *tool, int type);
+  VectorScaleTool(VectorSelectionTool *tool, ScaleType type);
 
-  TPointD transform(int index,
-                    TPointD newPos) override;  //!< Returns scale value.
+  TPointD transform(int index, TPointD newPos, bool onFastDragging = false)
+      override;  //!< Returns scale value.
 
   void leftButtonDown(const TPointD &pos, const TMouseEvent &e) override;
   void leftButtonDrag(const TPointD &pos, const TMouseEvent &e) override;
@@ -306,11 +307,19 @@ public:
 
   TPropertyGroup *getProperties(int targetType) override;
 
+  bool m_resetCenter;
+
+  void setResetCenter(bool update) { m_resetCenter = update; }
+  bool canResetCenter() { return m_resetCenter; }
+
+  bool isSelectionEditable() override { return m_strokeSelection.isEditable(); }
+
 protected:
   void onActivate() override;
   void onDeactivate() override;
 
   void leftButtonDrag(const TPointD &pos, const TMouseEvent &) override;
+  void leftButtonDown(const TPointD &pos, const TMouseEvent &) override;
   void leftButtonUp(const TPointD &pos, const TMouseEvent &) override;
   void leftButtonDoubleClick(const TPointD &, const TMouseEvent &e) override;
   void addContextMenuItems(QMenu *menu) override;
@@ -322,6 +331,14 @@ protected:
 
   bool onPropertyChanged(std::string propertyName) override;
   void onImageChanged() override;
+
+  int getCursorId() const override {
+    if (m_viewer && m_viewer->getGuidedStrokePickerMode())
+      return m_viewer->getGuidedStrokePickerCursor();
+    return m_cursorId;
+  }
+
+  bool isDragging() const override;
 
 private:
   class AttachedLevelSelection final : public LevelSelection {
@@ -341,6 +358,7 @@ private:
 private:
   TEnumProperty m_selectionTarget;  //!< Selected target content (strokes, whole
                                     //! image, styles...).
+  TBoolProperty m_includeIntersection;
   TBoolProperty m_constantThickness;
 
   StrokeSelection m_strokeSelection;        //!< Standard selection of a set of
@@ -367,7 +385,7 @@ private:
   void doOnActivate() override;
   void doOnDeactivate() override;
 
-  void selectRegionVectorImage();
+  void selectRegionVectorImage(bool includeIntersect);
 
   void updateTranslation() override;
 

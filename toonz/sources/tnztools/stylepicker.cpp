@@ -11,6 +11,9 @@
 #include "toonz/dpiscale.h"
 #include "tpixelutils.h"
 #include "tregion.h"
+#include "toonzqt/gutil.h"
+
+#include <QRect>
 
 //---------------------------------------------------------
 
@@ -42,7 +45,7 @@ TPoint StylePicker::getRasterPoint(const TPointD &p) const {
 //---------------------------------------------------------
 /*-- (StylePickerTool内で)LineとAreaを切り替えてPickできる。mode: 0=Area,
  * 1=Line, 2=Line&Areas(default)  --*/
-int StylePicker::pickStyleId(const TPointD &pos, double radius2,
+int StylePicker::pickStyleId(const TPointD &pos, double radius, double scale2,
                              int mode) const {
   int styleId = 0;
   if (TToonzImageP ti = m_image) {
@@ -74,13 +77,8 @@ int StylePicker::pickStyleId(const TPointD &pos, double radius2,
     styleId      = palette->getClosestStyle(col);
   } else if (TVectorImageP vi = m_image) {
     // prima cerca lo stile della regione piu' vicina
-    TRegion *r     = vi->getRegion(pos);
+    TRegion *r = vi->getRegion(pos);
     if (r) styleId = r->getStyle();
-    // poi cerca quello della stroke, ma se prima aveva trovato una regione,
-    // richiede che
-    // il click sia proprio sopra la stroke, altrimenti cerca la stroke piu'
-    // vicina (max circa 10 pixel)
-    const double maxDist2 = (styleId == 0) ? 100.0 * radius2 : 0;
     bool strokeFound;
     double dist2, w, thick;
     UINT index;
@@ -88,9 +86,16 @@ int StylePicker::pickStyleId(const TPointD &pos, double radius2,
     // la thickness, cioe' la min distance dalla outline e non dalla centerLine
     strokeFound = vi->getNearestStroke(pos, w, index, dist2);
     if (strokeFound) {
+      int devPixRatio = getDevPixRatio();
+      dist2 *= scale2;
       TStroke *stroke = vi->getStroke(index);
       thick           = stroke->getThickPoint(w).thick;
-      if (dist2 - thick * thick < maxDist2) {
+      double len2     = thick * thick * scale2;
+      const double minDist2 =
+          (styleId == 0) ? radius * radius * (double)(devPixRatio * devPixRatio)
+                         : 0;
+      double checkDist = std::max(minDist2, len2);
+      if (dist2 < checkDist) {
         assert(stroke);
         styleId = stroke->getStyle();
       }
@@ -101,7 +106,7 @@ int StylePicker::pickStyleId(const TPointD &pos, double radius2,
 
 //---------------------------------------------------------
 /*--- Toonz Raster LevelのToneを拾う。 ---*/
-int StylePicker::pickTone(const TPointD &pos) {
+int StylePicker::pickTone(const TPointD &pos) const {
   if (TToonzImageP ti = m_image) {
     TRasterCM32P ras = ti->getRaster();
     if (!ras) return -1;
@@ -116,9 +121,11 @@ int StylePicker::pickTone(const TPointD &pos) {
 
 //---------------------------------------------------------
 
-TPixel32 StylePicker::pickColor(const TPointD &pos, double radius2) const {
+TPixel32 StylePicker::pickColor(const TPointD &pos, double radius,
+                                double scale2) const {
   TToonzImageP ti  = m_image;
   TRasterImageP ri = m_image;
+  TVectorImageP vi = m_image;
   if (!!ri)  // !!ti || !!ri)
   {
     TRasterP raster;
@@ -135,12 +142,74 @@ TPixel32 StylePicker::pickColor(const TPointD &pos, double radius2) const {
 
     TRasterGR8P rasterGR8 = raster;
     if (rasterGR8) return toPixel32(rasterGR8->pixels(point.y)[point.x]);
-  } else if (TVectorImageP vi = m_image) {
+  } else if (vi) {
     const TPalette *palette = m_palette.getPointer();
     if (!palette) return TPixel32::Transparent;
-    int styleId = pickStyleId(pos, radius2);
+    int styleId = pickStyleId(pos, radius, scale2);
     if (0 <= styleId && styleId < palette->getStyleCount())
       return palette->getStyle(styleId)->getAverageColor();
+  } else if (ti) {
+    const TPalette *palette = m_palette.getPointer();
+    if (!palette) return TPixel32::Transparent;
+    int paintId = pickStyleId(pos, radius, scale2, 0);
+    int inkId   = pickStyleId(pos, radius, scale2, 1);
+    int tone    = pickTone(pos);
+    TPixel32 ink, paint;
+    if (0 <= inkId && inkId < palette->getStyleCount())
+      ink = palette->getStyle(inkId)->getAverageColor();
+    if (0 <= paintId && paintId < palette->getStyleCount())
+      paint = palette->getStyle(paintId)->getAverageColor();
+
+    if (tone == 0)
+      return ink;
+    else if (tone == 255)
+      return paint;
+    else
+      return blend(ink, paint, tone, TPixelCM32::getMaxTone());
+  }
+  return TPixel32::Transparent;
+}
+
+//---------------------------------------------------------
+
+TPixel32 StylePicker::pickAverageColor(const TRectD &rect) const {
+  TRasterImageP ri = m_image;
+  assert(ri);
+  if (!!ri) {
+    TRasterP raster;
+    raster = ri->getRaster();
+
+    TPoint topLeft     = getRasterPoint(rect.getP00());
+    TPoint bottomRight = getRasterPoint(rect.getP11());
+
+    if (!raster->getBounds().overlaps(TRect(topLeft, bottomRight)))
+      return TPixel32::Transparent;
+
+    topLeft.x     = std::max(0, topLeft.x);
+    topLeft.y     = std::max(0, topLeft.y);
+    bottomRight.x = std::min(raster->getLx(), bottomRight.x);
+    bottomRight.y = std::min(raster->getLy(), bottomRight.y);
+
+    TRaster32P raster32 = raster;
+    assert(raster32);
+    if (raster32) {
+      UINT r = 0, g = 0, b = 0, m = 0, size = 0;
+      for (int y = topLeft.y; y < bottomRight.y; y++) {
+        TPixel32 *p = &raster32->pixels(y)[topLeft.x];
+        for (int x = topLeft.x; x < bottomRight.x; x++, p++) {
+          r += p->r;
+          g += p->g;
+          b += p->b;
+          m += p->m;
+          size++;
+        }
+      }
+
+      if (size)
+        return TPixel32(r / size, g / size, b / size, m / size);
+      else
+        return TPixel32::Transparent;
+    }
   }
   return TPixel32::Transparent;
 }
@@ -236,7 +305,7 @@ TPixel32 getAverageColor(TStroke *stroke) {
     return TPixel32(buffer[0].b, buffer[0].g, buffer[0].r, 255);
 }
 
-}  // namspace
+}  // namespace
 
 //---------------------------------------------------------
 
